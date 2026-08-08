@@ -46,11 +46,13 @@ const App: React.FC = () => {
       if (!sessionStorage.getItem('sessao_inicio')) {
         sessionStorage.setItem('sessao_inicio', Date.now().toString());
       }
-      setCurrentView('accountant');
+      if (currentView === 'home') {
+        setCurrentView('accountant');
+      }
     } else {
       sessionStorage.removeItem('sessao_inicio');
     }
-  }, [isLoaded, isSignedIn, clerk, user]);
+  }, [isLoaded, isSignedIn, clerk, user, currentView]);
 
   useEffect(() => {
     if (!isSignedIn) return;

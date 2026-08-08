@@ -672,7 +672,7 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
                     </button>
                     <button
                       onClick={exportarTXT}
-                      className="px-3.5 py-2 bg-slate-750 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition-colors"
+                      className="px-3.5 py-2 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition-colors"
                       title="Exportar em formato de Texto (.txt)"
                     >
                       <FileText className="w-3.5 h-3.5" />
