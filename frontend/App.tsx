@@ -55,6 +55,11 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isSignedIn) return;
 
+    // Não aplica timer de sessão para administradores
+    const emailsAdmin = ['adm@audifor.com.br', 'controller@audifor.com.br'];
+    const ehAdmin = emailsAdmin.includes(user?.primaryEmailAddress?.emailAddress?.toLowerCase() || '');
+    if (ehAdmin) return;
+
     const checarTempoSessao = () => {
       const inicio = sessionStorage.getItem('sessao_inicio');
       if (inicio) {
@@ -72,7 +77,7 @@ const App: React.FC = () => {
     const intervalo = setInterval(checarTempoSessao, 5000);
 
     return () => clearInterval(intervalo);
-  }, [isSignedIn, clerk]);
+  }, [isSignedIn, clerk, user]);
 
   if (currentView === 'accountant') {
     return (

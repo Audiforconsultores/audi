@@ -61,6 +61,7 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
   const [timeRecords, setTimeRecords] = useState<TimeRecord[]>([]);
   const [photos, setPhotos] = useState<EmployeePhoto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
   
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');
@@ -163,11 +164,37 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
     return matchesSearch && matchesEmployee && matchesDateStart && matchesDateEnd;
   });
 
+  // Registros que serão exportados (selecionados ou todos os filtrados se nenhum selecionado)
+  const registrosParaExportar = selectedRecordIds.length > 0 
+    ? timeRecords.filter(r => selectedRecordIds.includes(r.id)) 
+    : registrosFiltrados;
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedRecordIds(registrosFiltrados.map(r => r.id));
+    } else {
+      setSelectedRecordIds([]);
+    }
+  };
+
+  const handleSelectRow = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedRecordIds(prev => [...prev, id]);
+    } else {
+      setSelectedRecordIds(prev => prev.filter(rId => rId !== id));
+    }
+  };
+
   const exportarCSV = () => {
+    const registros = registrosParaExportar;
+    if (registros.length === 0) {
+      alert('Nenhum registro para exportar.');
+      return;
+    }
     let csvContent = 'data:text/csv;charset=utf-8,';
     csvContent += 'Colaborador,Email,Tipo de Ponto,Data,Hora,Distancia (m),Valido\n';
 
-    registrosFiltrados.forEach(rec => {
+    registros.forEach(rec => {
       const emp = employees.find(e => e.clerk_id === rec.clerk_id);
       const nome = emp ? emp.name : 'Desconhecido';
       const email = emp ? emp.email : 'Desconhecido';
@@ -187,6 +214,95 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const exportarTXT = () => {
+    const registros = registrosParaExportar;
+    if (registros.length === 0) {
+      alert('Nenhum registro para exportar.');
+      return;
+    }
+    let txtContent = 'RELATÓRIO DE PONTO ELETRÔNICO - AUDIFOR CONSULTORES\n';
+    txtContent += '==================================================\n\n';
+    registros.forEach(rec => {
+      const emp = employees.find(e => e.clerk_id === rec.clerk_id);
+      txtContent += `Colaborador: ${emp?.name || 'Desconhecido'}\n`;
+      txtContent += `Email: ${emp?.email || 'Desconhecido'}\n`;
+      txtContent += `Tipo de Ponto: ${deTipoBancoParaFrontend(rec.record_type)}\n`;
+      txtContent += `Data: ${formatarDataLocal(rec.recorded_at)} às ${formatarHoraLocal(rec.recorded_at)}\n`;
+      txtContent += `Distância: ${rec.distance_meters ? `${rec.distance_meters} metros` : 'Bypass'}\n`;
+      txtContent += `Validação: ${rec.is_valid ? 'Dentro do raio' : 'Fora do raio'}\n`;
+      txtContent += '--------------------------------------------------\n';
+    });
+
+    const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `relatorio_pontos_${new Date().toISOString().split('T')[0]}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportarXLSX = () => {
+    const registros = registrosParaExportar;
+    if (registros.length === 0) {
+      alert('Nenhum registro para exportar.');
+      return;
+    }
+    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
+    html += '<head><meta charset="utf-8" /><style>table { border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 5px; }</style></head><body>';
+    html += '<table>';
+    html += '<thead><tr><th>Colaborador</th><th>Email</th><th>Tipo de Ponto</th><th>Data</th><th>Hora</th><th>Distancia (m)</th><th>Status</th></tr></thead>';
+    html += '<tbody>';
+    registros.forEach(rec => {
+      const emp = employees.find(e => e.clerk_id === rec.clerk_id);
+      const nome = emp ? emp.name : 'Desconhecido';
+      const email = emp ? emp.email : 'Desconhecido';
+      const tipo = deTipoBancoParaFrontend(rec.record_type);
+      const data = formatarDataLocal(rec.recorded_at);
+      const hora = formatarHoraLocal(rec.recorded_at);
+      const dist = rec.distance_meters || 0;
+      const status = rec.is_valid ? 'Valido' : 'Invalido';
+      html += `<tr><td>${nome}</td><td>${email}</td><td>${tipo}</td><td>${data}</td><td>${hora}</td><td>${dist}</td><td>${status}</td></tr>`;
+    });
+    html += '</tbody></table></body></html>';
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `relatorio_pontos_${new Date().toISOString().split('T')[0]}.xls`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportarGoogleSheets = async () => {
+    const registros = registrosParaExportar;
+    if (registros.length === 0) {
+      alert('Nenhum registro para exportar.');
+      return;
+    }
+    let tsv = 'Colaborador\tEmail\tTipo de Ponto\tData\tHora\tDistancia (m)\tStatus\n';
+    registros.forEach(rec => {
+      const emp = employees.find(e => e.clerk_id === rec.clerk_id);
+      const nome = emp ? emp.name : 'Desconhecido';
+      const email = emp ? emp.email : 'Desconhecido';
+      const tipo = deTipoBancoParaFrontend(rec.record_type);
+      const data = formatarDataLocal(rec.recorded_at);
+      const hora = formatarHoraLocal(rec.recorded_at);
+      const dist = rec.distance_meters || 0;
+      const status = rec.is_valid ? 'Valido' : 'Invalido';
+      tsv += `${nome}\t${email}\t${tipo}\t${data}\t${hora}\t${dist}\t${status}\n`;
+    });
+
+    try {
+      await navigator.clipboard.writeText(tsv);
+      alert('Dados copiados com sucesso! Abra uma planilha em branco no Google Sheets, clique na primeira célula e aperte Ctrl+V para colar tudo organizado em colunas.');
+    } catch (err) {
+      console.error('Erro ao copiar para clipboard:', err);
+      alert('Erro ao copiar para a área de transferência.');
+    }
   };
 
   return (
@@ -537,21 +653,46 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       onClick={exportarCSV}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition-colors"
-                      title="Exportar dados da busca em formato Excel/CSV"
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition-colors"
+                      title="Exportar em formato CSV"
                     >
-                      <FileSpreadsheet className="w-4 h-4" />
-                      <span>Exportar CSV</span>
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <span>CSV</span>
                     </button>
-                    {(searchQuery || filterDateStart || filterDateEnd) && (
+                    <button
+                      onClick={exportarXLSX}
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition-colors"
+                      title="Exportar em formato Excel (.xls)"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>XLSX</span>
+                    </button>
+                    <button
+                      onClick={exportarTXT}
+                      className="px-3.5 py-2 bg-slate-750 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition-colors"
+                      title="Exportar em formato de Texto (.txt)"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>TXT</span>
+                    </button>
+                    <button
+                      onClick={exportarGoogleSheets}
+                      className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition-colors"
+                      title="Copiar dados para colar no Google Sheets"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <span>Google Sheets</span>
+                    </button>
+                    {(searchQuery || filterDateStart || filterDateEnd || selectedRecordIds.length > 0) && (
                       <button
                         onClick={() => {
                           setSearchQuery('');
                           setFilterDateStart('');
                           setFilterDateEnd('');
+                          setSelectedRecordIds([]);
                         }}
                         className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold rounded-xl text-xs"
                       >
@@ -567,6 +708,14 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase border-b border-slate-100">
+                          <th className="py-3 px-5 w-10">
+                            <input
+                              type="checkbox"
+                              checked={registrosFiltrados.length > 0 && selectedRecordIds.length === registrosFiltrados.length}
+                              onChange={e => handleSelectAll(e.target.checked)}
+                              className="rounded border-slate-300 text-red-600 focus:ring-red-500 h-4 w-4 cursor-pointer"
+                            />
+                          </th>
                           <th className="py-3 px-5">Colaborador</th>
                           <th className="py-3 px-5">Tipo</th>
                           <th className="py-3 px-5">Data</th>
@@ -589,7 +738,17 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
                             const foto = photos.find(p => p.time_record_id === rec.id);
 
                             return (
-                              <tr key={rec.id} className="hover:bg-slate-50/30 transition-colors">
+                              <tr key={rec.id} className={`hover:bg-slate-50/30 transition-colors ${
+                                selectedRecordIds.includes(rec.id) ? 'bg-red-50/20' : ''
+                              }`}>
+                                <td className="py-3.5 px-5 w-10">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedRecordIds.includes(rec.id)}
+                                    onChange={e => handleSelectRow(rec.id, e.target.checked)}
+                                    className="rounded border-slate-300 text-red-600 focus:ring-red-500 h-4 w-4 cursor-pointer"
+                                  />
+                                </td>
                                 <td className="py-3.5 px-5">
                                   <strong className="text-slate-900 block font-extrabold">{emp?.name || 'Desconhecido'}</strong>
                                   <span className="text-[10px] text-slate-500">{emp?.email}</span>
