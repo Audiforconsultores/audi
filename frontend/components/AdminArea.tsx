@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, useUser, UserButton } from '@clerk/react';
 import { obterSupabaseClient } from '../supabase';
+import * as XLSX from 'xlsx';
 import { 
   FileText, 
   ArrowLeft, 
@@ -250,31 +251,24 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
       alert('Nenhum registro para exportar.');
       return;
     }
-    let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
-    html += '<head><meta charset="utf-8" /><style>table { border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 5px; }</style></head><body>';
-    html += '<table>';
-    html += '<thead><tr><th>Colaborador</th><th>Email</th><th>Tipo de Ponto</th><th>Data</th><th>Hora</th><th>Distancia (m)</th><th>Status</th></tr></thead>';
-    html += '<tbody>';
-    registros.forEach(rec => {
-      const emp = employees.find(e => e.clerk_id === rec.clerk_id);
-      const nome = emp ? emp.name : 'Desconhecido';
-      const email = emp ? emp.email : 'Desconhecido';
-      const tipo = deTipoBancoParaFrontend(rec.record_type);
-      const data = formatarDataLocal(rec.recorded_at);
-      const hora = formatarHoraLocal(rec.recorded_at);
-      const dist = rec.distance_meters || 0;
-      const status = rec.is_valid ? 'Valido' : 'Invalido';
-      html += `<tr><td>${nome}</td><td>${email}</td><td>${tipo}</td><td>${data}</td><td>${hora}</td><td>${dist}</td><td>${status}</td></tr>`;
-    });
-    html += '</tbody></table></body></html>';
 
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `relatorio_pontos_${new Date().toISOString().split('T')[0]}.xls`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const dadosExcel = registros.map(rec => {
+      const emp = employees.find(e => e.clerk_id === rec.clerk_id);
+      return {
+        'Colaborador': emp ? emp.name : 'Desconhecido',
+        'Email': emp ? emp.email : 'Desconhecido',
+        'Tipo de Ponto': deTipoBancoParaFrontend(rec.record_type),
+        'Data': formatarDataLocal(rec.recorded_at),
+        'Hora': formatarHoraLocal(rec.recorded_at),
+        'Distancia (m)': rec.distance_meters || 0,
+        'Status': rec.is_valid ? 'Valido' : 'Invalido'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dadosExcel);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Pontos');
+    XLSX.writeFile(workbook, `relatorio_pontos_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const exportarGoogleSheets = async () => {
