@@ -224,6 +224,9 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
     }
   }, [isSignedIn, dataAtual, pontoSucesso]);
 
+  // CONFIGURAÇÃO DE TESTE: Altere para false para reativar o geofencing (bloqueio por distância)
+  const DESATIVAR_GEOFENCING = true;
+
   const LATITUDE_ESCRITORIO = -15.5840;
   const LONGITUDE_ESCRITORIO = -56.0720;
   const RAIO_PERMITIDO_METROS = 100; // 100 metros de tolerância
@@ -366,7 +369,7 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
         LONGITUDE_ESCRITORIO
       );
 
-      const estaNoRaioPermitido = distanciaCalculada <= RAIO_PERMITIDO_METROS;
+      const estaNoRaioPermitido = DESATIVAR_GEOFENCING || (distanciaCalculada <= RAIO_PERMITIDO_METROS);
 
       if (!estaNoRaioPermitido) {
         alert(`Acesso Negado: Registro de ponto bloqueado. Você está a ${distanciaCalculada} metros de distância, o que fica FORA DO RAIO máximo permitido (limite de ${RAIO_PERMITIDO_METROS} metros) da empresa Audifor Consultores.`);
