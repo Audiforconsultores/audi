@@ -86,3 +86,27 @@ CREATE POLICY "Employees can select their own time records" ON time_records
 CREATE POLICY "Admins can select all time records" ON time_records
   FOR SELECT
   USING (public.is_admin());
+
+-- =======================================================
+-- 3. TABELA EMPLOYEE_PHOTOS (FOTOS DE BIOMETRIA)
+-- =======================================================
+CREATE TABLE IF NOT EXISTS employee_photos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clerk_id TEXT REFERENCES employees(clerk_id) ON DELETE CASCADE,
+  time_record_id UUID REFERENCES time_records(id) ON DELETE CASCADE,
+  photo_data TEXT NOT NULL, -- Armazena a string Base64 da foto
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Habilitar RLS
+ALTER TABLE employee_photos ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de RLS para employee_photos
+CREATE POLICY "Employees can insert their own photos" ON employee_photos
+  FOR INSERT
+  WITH CHECK (clerk_id = public.clerk_user_id());
+
+CREATE POLICY "Admins can select all photos" ON employee_photos
+  FOR SELECT
+  USING (public.is_admin());
+

@@ -377,7 +377,7 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
       }
 
       // Salva no banco de dados do Supabase
-      const { error } = await supabaseClient
+      const { data: recordData, error } = await supabaseClient
         .from('time_records')
         .insert([{
           clerk_id: user?.id,
@@ -385,11 +385,27 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
           latitude: coordenadas.latitude,
           longitude: coordenadas.longitude,
           distance_meters: distanciaCalculada,
-          is_valid: true,
-          photo_path: tipoRegistro === 'Entrada' ? fotoCapturada : null
-        }]);
+          is_valid: true
+        }])
+        .select();
 
       if (error) throw error;
+
+      // Se for Entrada, salva a foto de biometria na tabela dedicada 'employee_photos'
+      if (tipoRegistro === 'Entrada' && fotoCapturada && recordData && recordData[0]) {
+        const timeRecordId = recordData[0].id;
+        const { error: photoError } = await supabaseClient
+          .from('employee_photos')
+          .insert([{
+            clerk_id: user?.id,
+            time_record_id: timeRecordId,
+            photo_data: fotoCapturada
+          }]);
+        
+        if (photoError) {
+          console.error('Erro ao salvar foto de biometria:', photoError);
+        }
+      }
 
       setFotoCapturada(null);
       setPontoSucesso(`Ponto de ${tipoRegistro} registrado com sucesso! Você está a ${distanciaCalculada}m do escritório.`);
