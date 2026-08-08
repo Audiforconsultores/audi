@@ -8,12 +8,13 @@ import TaxReform from './components/TaxReform';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
 import AccountantArea from './components/AccountantArea';
+import AdminArea from './components/AdminArea';
 
 const App: React.FC = () => {
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const clerk = useClerk();
-  const [currentView, setCurrentView] = useState<'home' | 'accountant'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'accountant' | 'admin'>('home');
   const inicializadoRef = useRef(false);
 
   useEffect(() => {
@@ -74,7 +75,16 @@ const App: React.FC = () => {
   }, [isSignedIn, clerk]);
 
   if (currentView === 'accountant') {
-    return <AccountantArea onBackToHome={() => setCurrentView('home')} />;
+    return (
+      <AccountantArea 
+        onBackToHome={() => setCurrentView('home')} 
+        onGoToAdmin={() => setCurrentView('admin')}
+      />
+    );
+  }
+
+  if (currentView === 'admin') {
+    return <AdminArea onBackToPortal={() => setCurrentView('accountant')} />;
   }
 
   return (

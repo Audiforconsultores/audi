@@ -73,13 +73,17 @@ app.post('/api/webhooks/clerk', express.raw({ type: 'application/json' }), async
 
     if (supabase) {
       try {
+        const emailsAdmin = ['adm@audifor.com.br', 'controller@audifor.com.br'];
+        const ehAdmin = emailsAdmin.includes(email.toLowerCase());
+
         const { error } = await supabase
           .from('employees')
           .upsert({
             clerk_id: clerkId,
             name: nome,
             email: email,
-            is_active: true
+            is_active: true,
+            is_admin: ehAdmin
           }, { onConflict: 'clerk_id' });
 
         if (error) throw error;
