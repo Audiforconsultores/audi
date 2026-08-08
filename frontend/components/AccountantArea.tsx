@@ -205,27 +205,9 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
     });
   };
 
-  const verificarBloqueioPonto = (tipo: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída'): { bloqueado: boolean; tempoRestanteFormatado?: string } => {
-    const ultimoPonto = historicoPontos.find(p => p.tipo === tipo);
-    if (!ultimoPonto || !ultimoPonto.recordedAtRaw) {
-      return { bloqueado: false };
-    }
-
-    const dataRegistro = new Date(ultimoPonto.recordedAtRaw);
-    const diferencaMs = Date.now() - dataRegistro.getTime();
-    const limiteMs = 15 * 60 * 60 * 1000; // 15 horas
-
-    if (diferencaMs < limiteMs) {
-      const restanteMs = limiteMs - diferencaMs;
-      const horas = Math.floor(restanteMs / (60 * 60 * 1000));
-      const minutos = Math.floor((restanteMs % (60 * 60 * 1000)) / (60 * 1000));
-      return { 
-        bloqueado: true, 
-        tempoRestanteFormatado: `${horas}h ${minutos}m` 
-      };
-    }
-
-    return { bloqueado: false };
+  const verificarBloqueioPonto = (tipo: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída'): { bloqueado: boolean } => {
+    const jaRegistrouHoje = historicoPontos.some(p => p.tipo === tipo && p.dataRegistro === dataAtual);
+    return { bloqueado: jaRegistrouHoje };
   };
 
   const renderizarBotaoPonto = (
@@ -233,20 +215,20 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
     icone: React.ReactNode,
     classeEstiloAtivo: string
   ) => {
-    const { bloqueado, tempoRestanteFormatado } = verificarBloqueioPonto(tipo);
+    const { bloqueado } = verificarBloqueioPonto(tipo);
 
     if (bloqueado) {
       return (
         <button
           disabled
-          className="flex flex-col items-center justify-center gap-0.5 py-1.5 px-4 bg-emerald-950/20 text-emerald-300/40 border border-emerald-800/20 rounded-xl cursor-not-allowed opacity-60 text-xs md:text-sm font-bold w-full"
-          title={`Bloqueado. Você já registrou ${tipo} recentemente.`}
+          className="flex flex-col items-center justify-center gap-0.5 py-2 px-4 bg-emerald-950/20 text-emerald-300/40 border border-emerald-800/20 rounded-xl cursor-not-allowed opacity-60 text-xs md:text-sm font-bold w-full"
+          title={`Você já registrou ${tipo} hoje.`}
         >
           <div className="flex items-center gap-1.5">
             <Lock className="w-3.5 h-3.5" />
             <span>{tipo}</span>
           </div>
-          <span className="text-[9px] font-normal">Livre em {tempoRestanteFormatado}</span>
+          <span className="text-[9px] font-normal">Registrado hoje</span>
         </button>
       );
     }
