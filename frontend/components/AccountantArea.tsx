@@ -22,7 +22,8 @@ import {
   Sparkles,
   UserCheck,
   Fingerprint,
-  Check
+  Check,
+  Lock
 } from 'lucide-react';
 
 interface AccountantAreaProps {
@@ -66,6 +67,7 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
     tipo: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída';
     horario: string;
     dataRegistro: string;
+    recordedAtRaw?: string;
   }
 
   const [horaAtual, setHoraAtual] = useState<string>('');
@@ -146,7 +148,8 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
               id: item.id,
               tipo: deTipoBancoParaTipoFrontend(item.record_type),
               horario: `${horas}:${minutos}:${segundos}`,
-              dataRegistro: `${dia}/${mes}/${ano}`
+              dataRegistro: `${dia}/${mes}/${ano}`,
+              recordedAtRaw: item.recorded_at
             };
           });
           setHistoricoPontos(pontosFormatados);
@@ -200,6 +203,63 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
         }
       );
     });
+  };
+
+  const verificarBloqueioPonto = (tipo: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída'): { bloqueado: boolean; tempoRestanteFormatado?: string } => {
+    const ultimoPonto = historicoPontos.find(p => p.tipo === tipo);
+    if (!ultimoPonto || !ultimoPonto.recordedAtRaw) {
+      return { bloqueado: false };
+    }
+
+    const dataRegistro = new Date(ultimoPonto.recordedAtRaw);
+    const diferencaMs = Date.now() - dataRegistro.getTime();
+    const limiteMs = 15 * 60 * 60 * 1000; // 15 horas
+
+    if (diferencaMs < limiteMs) {
+      const restanteMs = limiteMs - diferencaMs;
+      const horas = Math.floor(restanteMs / (60 * 60 * 1000));
+      const minutos = Math.floor((restanteMs % (60 * 60 * 1000)) / (60 * 1000));
+      return { 
+        bloqueado: true, 
+        tempoRestanteFormatado: `${horas}h ${minutos}m` 
+      };
+    }
+
+    return { bloqueado: false };
+  };
+
+  const renderizarBotaoPonto = (
+    tipo: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída',
+    icone: React.ReactNode,
+    classeEstiloAtivo: string
+  ) => {
+    const { bloqueado, tempoRestanteFormatado } = verificarBloqueioPonto(tipo);
+
+    if (bloqueado) {
+      return (
+        <button
+          disabled
+          className="flex flex-col items-center justify-center gap-0.5 py-1.5 px-4 bg-emerald-950/20 text-emerald-300/40 border border-emerald-800/20 rounded-xl cursor-not-allowed opacity-60 text-xs md:text-sm font-bold w-full"
+          title={`Bloqueado. Você já registrou ${tipo} recentemente.`}
+        >
+          <div className="flex items-center gap-1.5">
+            <Lock className="w-3.5 h-3.5" />
+            <span>{tipo}</span>
+          </div>
+          <span className="text-[9px] font-normal">Livre em {tempoRestanteFormatado}</span>
+        </button>
+      );
+    }
+
+    return (
+      <button
+        onClick={() => setPontoParaConfirmar(tipo)}
+        className={`flex items-center justify-center gap-2 py-3 px-4 font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5 w-full text-xs md:text-sm ${classeEstiloAtivo}`}
+      >
+        {icone}
+        <span>{tipo}</span>
+      </button>
+    );
   };
 
   const executarBaterPonto = async (tipoRegistro: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída') => {
@@ -715,34 +775,26 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
                     </p>
 
                     <div className="grid grid-cols-2 gap-4 pt-2">
-                      <button
-                        onClick={() => setPontoParaConfirmar('Entrada')}
-                        className="flex items-center justify-center gap-2 py-3 px-4 bg-white hover:bg-emerald-50 text-emerald-900 font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
-                      >
-                        <Fingerprint className="w-4 h-4 text-emerald-600" />
-                        Entrada
-                      </button>
-                      <button
-                        onClick={() => setPontoParaConfirmar('Intervalo')}
-                        className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-500/30 hover:bg-emerald-500/50 text-white border border-emerald-400/30 font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
-                      >
-                        <Clock className="w-4 h-4" />
-                        Almoço
-                      </button>
-                      <button
-                        onClick={() => setPontoParaConfirmar('Retorno')}
-                        className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-500/30 hover:bg-emerald-500/50 text-white border border-emerald-400/30 font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
-                      >
-                        <Clock className="w-4 h-4" />
-                        Retorno
-                      </button>
-                      <button
-                        onClick={() => setPontoParaConfirmar('Saída')}
-                        className="flex items-center justify-center gap-2 py-3 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
-                      >
-                        <Fingerprint className="w-4 h-4" />
-                        Saída
-                      </button>
+                      {renderizarBotaoPonto(
+                        'Entrada', 
+                        <Fingerprint className="w-4 h-4 text-emerald-600" />, 
+                        'bg-white hover:bg-emerald-50 text-emerald-900'
+                      )}
+                      {renderizarBotaoPonto(
+                        'Intervalo', 
+                        <Clock className="w-4 h-4 text-amber-500" />, 
+                        'bg-emerald-500/30 hover:bg-emerald-500/50 text-white border border-emerald-400/30'
+                      )}
+                      {renderizarBotaoPonto(
+                        'Retorno', 
+                        <Clock className="w-4 h-4 text-amber-500" />, 
+                        'bg-emerald-500/30 hover:bg-emerald-500/50 text-white border border-emerald-400/30'
+                      )}
+                      {renderizarBotaoPonto(
+                        'Saída', 
+                        <Fingerprint className="w-4 h-4 text-rose-300" />, 
+                        'bg-rose-600 hover:bg-rose-700 text-white'
+                      )}
                     </div>
                   </div>
 
