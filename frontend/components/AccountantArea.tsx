@@ -23,7 +23,10 @@ import {
   UserCheck,
   Fingerprint,
   Check,
-  Lock
+  Lock,
+  Camera,
+  RefreshCw,
+  Video
 } from 'lucide-react';
 
 interface AccountantAreaProps {
@@ -39,6 +42,61 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [tempoRestante, setTempoRestante] = useState<string>('07:00');
   const [pontoParaConfirmar, setPontoParaConfirmar] = useState<'Entrada' | 'Almoço' | 'Retorno' | 'Saída' | null>(null);
+  const [fotoCapturada, setFotoCapturada] = useState<string | null>(null);
+  const [mostrandoCapturaFacial, setMostrandoCapturaFacial] = useState(false);
+  const [cameraAtiva, setCameraAtiva] = useState(false);
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+
+  const iniciarCamera = async () => {
+    setCameraAtiva(true);
+    setFotoCapturada(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' }
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error('Erro ao acessar a câmera:', err);
+      alert('Erro ao acessar a câmera frontal. Certifique-se de dar permissões de câmera.');
+      fecharCamera();
+    }
+  };
+
+  const fecharCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setCameraAtiva(false);
+    setMostrandoCapturaFacial(false);
+  };
+
+  const capturarFoto = () => {
+    if (videoRef.current) {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        setFotoCapturada(dataUrl);
+        
+        if (video.srcObject) {
+          const stream = video.srcObject as MediaStream;
+          stream.getTracks().forEach(track => track.stop());
+          video.srcObject = null;
+        }
+        setCameraAtiva(false);
+      }
+    }
+  };
 
   useEffect(() => {
     const atualizarTimer = () => {
@@ -269,7 +327,14 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
 
     return (
       <button
-        onClick={() => setPontoParaConfirmar(tipo)}
+        onClick={() => {
+          if (tipo === 'Entrada') {
+            setMostrandoCapturaFacial(true);
+            setTimeout(iniciarCamera, 150);
+          } else {
+            setPontoParaConfirmar(tipo);
+          }
+        }}
         className={`flex items-center justify-center gap-2 py-3 px-4 font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5 w-full text-xs md:text-sm ${classeEstiloAtivo}`}
       >
         {icone}
@@ -317,11 +382,13 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
           latitude: coordenadas.latitude,
           longitude: coordenadas.longitude,
           distance_meters: distanciaCalculada,
-          is_valid: true
+          is_valid: true,
+          photo_path: tipoRegistro === 'Entrada' ? fotoCapturada : null
         }]);
 
       if (error) throw error;
 
+      setFotoCapturada(null);
       setPontoSucesso(`Ponto de ${tipoRegistro} registrado com sucesso! Você está a ${distanciaCalculada}m do escritório.`);
       
       setTimeout(() => {
@@ -1049,6 +1116,12 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
                   <span>Horário: <strong>{horaAtual}</strong> do dia <strong>{dataAtual}</strong></span>
                 </div>
+                {pontoParaConfirmar === 'Entrada' && fotoCapturada && (
+                  <div className="mt-3 border border-slate-200 rounded-xl overflow-hidden max-w-[120px] mx-auto shadow-sm">
+                    <img src={fotoCapturada} alt="Facial" className="w-full h-auto object-cover" />
+                    <span className="block text-[8px] text-center bg-slate-100 text-slate-500 py-0.5">Biometria Facial</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3">
@@ -1069,6 +1142,86 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
                   Confirmar
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Captura Facial (Camera) */}
+        {mostrandoCapturaFacial && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+              <div className="flex items-center gap-3 text-ocean-600 mb-4">
+                <div className="p-2.5 bg-ocean-50 rounded-xl border border-ocean-100">
+                  <Camera className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 leading-none">Biometria Facial</h3>
+                  <p className="text-[10px] text-slate-500 mt-1">Regra de Entrada do Ponto</p>
+                </div>
+              </div>
+
+              {/* Camera Stream viewport */}
+              <div className="relative aspect-video bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-inner flex items-center justify-center mb-6">
+                {!fotoCapturada ? (
+                  <video 
+                    ref={videoRef} 
+                    autoPlay 
+                    playsInline 
+                    className="w-full h-full object-cover transform -scale-x-100"
+                  />
+                ) : (
+                  <img 
+                    src={fotoCapturada} 
+                    alt="Foto Capturada" 
+                    className="w-full h-full object-cover" 
+                  />
+                )}
+
+                {cameraAtiva && (
+                  <div className="absolute top-3 left-3 bg-red-600/80 backdrop-blur-sm text-white px-2 py-0.5 rounded-md text-[9px] font-bold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                    <span>CÂMERA ATIVA</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Control Buttons */}
+              {!fotoCapturada ? (
+                <div className="flex gap-3">
+                  <button
+                    onClick={fecharCamera}
+                    className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs md:text-sm border border-slate-200/50"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    onClick={capturarFoto}
+                    className="flex-1 py-3 px-4 bg-ocean-600 hover:bg-ocean-700 text-white font-bold rounded-xl text-xs md:text-sm shadow-lg shadow-ocean-600/30 flex items-center justify-center gap-1.5"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Capturar Facial</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  <button
+                    onClick={iniciarCamera}
+                    className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs md:text-sm border border-slate-200/50 flex items-center justify-center gap-1.5"
+                  >
+                    <RefreshCw className="w-4 h-4 text-slate-500" />
+                    <span>Tentar Novamente</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMostrandoCapturaFacial(false);
+                      setPontoParaConfirmar('Entrada');
+                    }}
+                    className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs md:text-sm shadow-lg shadow-emerald-600/30"
+                  >
+                    Continuar com esta Foto
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
