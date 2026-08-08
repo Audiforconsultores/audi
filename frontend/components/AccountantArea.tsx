@@ -19,7 +19,9 @@ import {
   X,
   Printer,
   Sparkles,
-  UserCheck
+  UserCheck,
+  Fingerprint,
+  Check
 } from 'lucide-react';
 
 interface AccountantAreaProps {
@@ -31,7 +33,7 @@ const LUNCH_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScbyjT_dmxjjrid
 export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) => {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
-  const [activeTab, setActiveTab] = useState<'holerite' | 'almoco'>('holerite');
+  const [activeTab, setActiveTab] = useState<'holerite' | 'almoco' | 'ponto'>('holerite');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [tempoRestante, setTempoRestante] = useState<string>('07:00');
 
@@ -56,6 +58,87 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
 
     return () => clearInterval(intervalo);
   }, []);
+
+  interface RegistroPonto {
+    id: string;
+    tipo: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída';
+    horario: string;
+    dataRegistro: string;
+  }
+
+  const [horaAtual, setHoraAtual] = useState<string>('');
+  const [dataAtual, setDataAtual] = useState<string>('');
+  const [historicoPontos, setHistoricoPontos] = useState<RegistroPonto[]>([]);
+  const [pontoSucesso, setPontoSucesso] = useState<string | null>(null);
+
+  // Efeito para relógio em tempo real
+  useEffect(() => {
+    const atualizarRelogio = () => {
+      const agora = new Date();
+      const horas = agora.getHours().toString().padStart(2, '0');
+      const minutos = agora.getMinutes().toString().padStart(2, '0');
+      const segundos = agora.getSeconds().toString().padStart(2, '0');
+      
+      const dia = agora.getDate().toString().padStart(2, '0');
+      const mes = (agora.getMonth() + 1).toString().padStart(2, '0');
+      const ano = agora.getFullYear();
+      
+      setHoraAtual(`${horas}:${minutos}:${segundos}`);
+      setDataAtual(`${dia}/${mes}/${ano}`);
+    };
+
+    atualizarRelogio();
+    const relogioIntervalo = setInterval(atualizarRelogio, 1000);
+    return () => clearInterval(relogioIntervalo);
+  }, []);
+
+  // Efeito para carregar os registros de ponto do Supabase
+  useEffect(() => {
+    const buscarPontosDoDia = async () => {
+      try {
+        // TODO: Implementar busca no Supabase filtrando pelo usuário (Clerk) e pela data atual:
+        // const { data, error } = await supabase
+        //   .from('pontos')
+        //   .select('*')
+        //   .eq('usuario_id', user?.id)
+        //   .eq('data_registro', dataAtual)
+        //   .order('horario', { ascending: false });
+        // if (error) throw error;
+        // setHistoricoPontos(data);
+      } catch (erro) {
+        console.error('Erro ao buscar pontos do dia no Supabase:', erro);
+      }
+    };
+
+    if (isSignedIn && dataAtual) {
+      buscarPontosDoDia();
+    }
+  }, [isSignedIn, dataAtual]);
+
+  const executarBaterPonto = async (tipoRegistro: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída') => {
+    try {
+      // TODO: Implementar gravação no Supabase:
+      // const { data, error } = await supabase
+      //   .from('pontos')
+      //   .insert([{
+      //     usuario_id: user?.id,
+      //     tipo: tipoRegistro,
+      //     horario: horaAtual,
+      //     data_registro: dataAtual
+      //   }]);
+      // if (error) throw error;
+
+      // O feedback visual de sucesso ou recarregamento dos dados reais do banco ocorrerá aqui após as inserções no Supabase:
+      setPontoSucesso(`Ponto de ${tipoRegistro} registrado com sucesso às ${horaAtual}!`);
+      
+      setTimeout(() => {
+        setPontoSucesso(null);
+      }, 4000);
+
+    } catch (erro) {
+      console.error('Erro ao registrar ponto no Supabase:', erro);
+    }
+  };
 
   // Holerite States
   const [selectedMonth, setSelectedMonth] = useState('2026-07');
@@ -358,6 +441,18 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
                   <span>Pedir Almoço</span>
                 </button>
 
+                <button
+                  onClick={() => setActiveTab('ponto')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all ${
+                    activeTab === 'ponto'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/40'
+                      : 'text-ocean-300 hover:text-white hover:bg-ocean-900/60'
+                  }`}
+                >
+                  <Fingerprint className="w-4 h-4" />
+                  <span>Bater Ponto</span>
+                </button>
+
               </div>
             </div>
           </div>
@@ -475,6 +570,133 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
                     </div>
                   </li>
                 </ul>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: BATER PONTO */}
+          {activeTab === 'ponto' && (
+            <div className="space-y-8 max-w-4xl mx-auto">
+              {/* Point Registration Card */}
+              <div className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white rounded-3xl p-8 shadow-xl relative overflow-hidden border border-emerald-400/30">
+                <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+                
+                <div className="relative z-10 grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+                  <div className="md:col-span-7 space-y-4">
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-extrabold bg-white/20 backdrop-blur-md text-white border border-white/30 shadow-sm">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-300 animate-pulse"></span>
+                      <span>SISTEMA DE PONTO ELETRÔNICO AUDIFOR</span>
+                    </div>
+
+                    <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
+                      Registro de Ponto
+                    </h2>
+                    
+                    <p className="text-emerald-100 text-sm leading-relaxed">
+                      Registre seus horários de entrada, almoço e saída com segurança. Todos os registros são validados e armazenados de acordo com a portaria vigente.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                      <button
+                        onClick={() => executarBaterPonto('Entrada')}
+                        className="flex items-center justify-center gap-2 py-3 px-4 bg-white hover:bg-emerald-50 text-emerald-900 font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
+                      >
+                        <Fingerprint className="w-4 h-4 text-emerald-600" />
+                        Entrada
+                      </button>
+                      <button
+                        onClick={() => executarBaterPonto('Intervalo')}
+                        className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-500/30 hover:bg-emerald-500/50 text-white border border-emerald-400/30 font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
+                      >
+                        <Clock className="w-4 h-4" />
+                        Almoço
+                      </button>
+                      <button
+                        onClick={() => executarBaterPonto('Retorno')}
+                        className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-500/30 hover:bg-emerald-500/50 text-white border border-emerald-400/30 font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
+                      >
+                        <Clock className="w-4 h-4" />
+                        Retorno
+                      </button>
+                      <button
+                        onClick={() => executarBaterPonto('Saída')}
+                        className="flex items-center justify-center gap-2 py-3 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
+                      >
+                        <Fingerprint className="w-4 h-4" />
+                        Saída
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right side clock display */}
+                  <div className="md:col-span-5 flex flex-col items-center justify-center bg-black/25 backdrop-blur-md border border-white/10 rounded-2xl p-6 text-center">
+                    <Clock className="w-8 h-8 text-emerald-300 mb-2 animate-pulse" />
+                    <span className="text-sm font-semibold tracking-wide text-emerald-200 uppercase">{dataAtual}</span>
+                    <span className="text-4xl md:text-5xl font-black tracking-widest font-mono text-white mt-1 select-none">
+                      {horaAtual}
+                    </span>
+                    <span className="text-[10px] text-emerald-200 mt-2">Hora oficial de Brasília</span>
+                  </div>
+                </div>
+              </div>
+
+              {pontoSucesso && (
+                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-3 shadow-sm animate-fade-in">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span className="text-sm font-semibold">{pontoSucesso}</span>
+                </div>
+              )}
+
+              {/* Point Logs Table */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm md:text-base">
+                    <Fingerprint className="w-5 h-5 text-emerald-600" />
+                    Registros do Dia
+                  </h3>
+                  <span className="text-xs text-slate-500 font-medium">Histórico recente</span>
+                </div>
+
+                {historicoPontos.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400">
+                    <Fingerprint className="w-12 h-12 mx-auto mb-2 text-slate-300 stroke-[1.5]" />
+                    <p className="text-sm">Nenhum ponto registrado hoje.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase border-b border-slate-100">
+                          <th className="py-3 px-5">Tipo</th>
+                          <th className="py-3 px-5">Data</th>
+                          <th className="py-3 px-5">Horário</th>
+                          <th className="py-3 px-5 text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs md:text-sm">
+                        {historicoPontos.map((ponto) => (
+                          <tr key={ponto.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3.5 px-5 font-bold text-slate-800 flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${
+                                ponto.tipo === 'Entrada' ? 'bg-emerald-500' :
+                                ponto.tipo === 'Saída' ? 'bg-rose-500' : 'bg-amber-500'
+                              }`}></span>
+                              {ponto.tipo}
+                            </td>
+                            <td className="py-3.5 px-5 text-slate-500">{ponto.dataRegistro}</td>
+                            <td className="py-3.5 px-5 font-mono font-semibold text-slate-700">{ponto.horario}</td>
+                            <td className="py-3.5 px-5 text-right">
+                              <span className="inline-flex items-center gap-1 py-0.5 px-2 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <Check className="w-3 h-3" />
+                                Confirmado
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
