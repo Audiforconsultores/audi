@@ -253,7 +253,7 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
 
     } catch (erro: any) {
       console.error('Erro ao registrar ponto no Supabase:', erro);
-      alert(`Erro ao registrar ponto: ${erro.message || 'Verifique suas permissões no Supabase.'}`);
+      alert(`Erro ao registrar ponto: ${erro.message || 'Verifique suas permissões no Supabase.'}\nID do Usuário no Frontend: ${user?.id}`);
     }
   };
 
