@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, useUser, SignIn, SignUp, UserButton } from '@clerk/react';
+import { obterSupabaseClient } from '../supabase';
 import { 
   FileText, 
   Utensils, 
@@ -31,7 +32,7 @@ interface AccountantAreaProps {
 const LUNCH_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScbyjT_dmxjjrid1w_619BrGoAlk9vmRLAz51W4W-RysyvzsQ/viewform';
 
 export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) => {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState<'holerite' | 'almoco' | 'ponto'>('holerite');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -92,51 +93,127 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
     return () => clearInterval(relogioIntervalo);
   }, []);
 
+  const deTipoBancoParaTipoFrontend = (tipo: string): 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída' => {
+    switch (tipo) {
+      case 'entrada': return 'Entrada';
+      case 'saida_almoco': return 'Intervalo';
+      case 'retorno_almoco': return 'Retorno';
+      case 'saida': return 'Saída';
+      default: return 'Entrada';
+    }
+  };
+
+  const deTipoFrontendParaTipoBanco = (tipo: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída'): string => {
+    switch (tipo) {
+      case 'Entrada': return 'entrada';
+      case 'Intervalo': return 'saida_almoco';
+      case 'Retorno': return 'retorno_almoco';
+      case 'Saída': return 'saida';
+    }
+  };
+
+  const [carregandoPontos, setCarregandoPontos] = useState(false);
+
   // Efeito para carregar os registros de ponto do Supabase
   useEffect(() => {
     const buscarPontosDoDia = async () => {
+      setCarregandoPontos(true);
       try {
-        // TODO: Implementar busca no Supabase filtrando pelo usuário (Clerk) e pela data atual:
-        // const { data, error } = await supabase
-        //   .from('pontos')
-        //   .select('*')
-        //   .eq('usuario_id', user?.id)
-        //   .eq('data_registro', dataAtual)
-        //   .order('horario', { ascending: false });
-        // if (error) throw error;
-        // setHistoricoPontos(data);
+        const token = await getToken({ template: 'supabase' });
+        if (!token) return;
+        const supabaseClient = obterSupabaseClient(token);
+
+        const { data, error } = await supabaseClient
+          .from('time_records')
+          .select('*')
+          .order('recorded_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (data) {
+          const pontosFormatados: RegistroPonto[] = data.map((item: any) => {
+            const dataObjeto = new Date(item.recorded_at);
+            const horas = dataObjeto.getHours().toString().padStart(2, '0');
+            const minutos = dataObjeto.getMinutes().toString().padStart(2, '0');
+            const segundos = dataObjeto.getSeconds().toString().padStart(2, '0');
+            
+            const dia = dataObjeto.getDate().toString().padStart(2, '0');
+            const mes = (dataObjeto.getMonth() + 1).toString().padStart(2, '0');
+            const ano = dataObjeto.getFullYear();
+
+            return {
+              id: item.id,
+              tipo: deTipoBancoParaTipoFrontend(item.record_type),
+              horario: `${horas}:${minutos}:${segundos}`,
+              dataRegistro: `${dia}/${mes}/${ano}`
+            };
+          });
+          setHistoricoPontos(pontosFormatados);
+        }
       } catch (erro) {
         console.error('Erro ao buscar pontos do dia no Supabase:', erro);
+      } finally {
+        setCarregandoPontos(false);
       }
     };
 
     if (isSignedIn && dataAtual) {
       buscarPontosDoDia();
     }
-  }, [isSignedIn, dataAtual]);
+  }, [isSignedIn, dataAtual, pontoSucesso]);
+
+  const obterGeolocalizacao = (): Promise<{ latitude: number; longitude: number }> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve({ latitude: 0, longitude: 0 });
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (posicao) => {
+          resolve({
+            latitude: posicao.coords.latitude,
+            longitude: posicao.coords.longitude
+          });
+        },
+        () => {
+          resolve({ latitude: 0, longitude: 0 });
+        }
+      );
+    });
+  };
 
   const executarBaterPonto = async (tipoRegistro: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída') => {
     try {
-      // TODO: Implementar gravação no Supabase:
-      // const { data, error } = await supabase
-      //   .from('pontos')
-      //   .insert([{
-      //     usuario_id: user?.id,
-      //     tipo: tipoRegistro,
-      //     horario: horaAtual,
-      //     data_registro: dataAtual
-      //   }]);
-      // if (error) throw error;
+      const token = await getToken({ template: 'supabase' });
+      if (!token) {
+        alert('Erro de autenticação: Faça login novamente.');
+        return;
+      }
+      const supabaseClient = obterSupabaseClient(token);
+      const coordenadas = await obterGeolocalizacao();
 
-      // O feedback visual de sucesso ou recarregamento dos dados reais do banco ocorrerá aqui após as inserções no Supabase:
+      // Salva no banco de dados do Supabase
+      const { error } = await supabaseClient
+        .from('time_records')
+        .insert([{
+          clerk_id: user?.id,
+          record_type: deTipoFrontendParaTipoBanco(tipoRegistro),
+          latitude: coordenadas.latitude,
+          longitude: coordenadas.longitude,
+          is_valid: true
+        }]);
+
+      if (error) throw error;
+
       setPontoSucesso(`Ponto de ${tipoRegistro} registrado com sucesso às ${horaAtual}!`);
       
       setTimeout(() => {
         setPontoSucesso(null);
       }, 4000);
 
-    } catch (erro) {
+    } catch (erro: any) {
       console.error('Erro ao registrar ponto no Supabase:', erro);
+      alert(`Erro ao registrar ponto: ${erro.message || 'Verifique suas permissões no Supabase.'}`);
     }
   };
 
