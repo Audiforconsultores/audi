@@ -26,6 +26,19 @@ app.get('/api/saude', (req, res) => {
   });
 });
 
+// Endpoint para debug de colaboradores (bypass RLS via service role)
+app.get('/api/debug/employees', async (req: any, res: any) => {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('employees').select('*');
+      return res.json({ data, error });
+    } catch (e: any) {
+      return res.status(500).json({ erro: e.message });
+    }
+  }
+  return res.json({ erro: 'Supabase não instanciado no backend.' });
+});
+
 // Webhook do Clerk para Sincronização de Usuários com a tabela employees
 app.post('/api/webhooks/clerk', express.raw({ type: 'application/json' }), async (req: any, res: any) => {
   const segredoWebhook = process.env.CLERK_WEBHOOK_SECRET || '';
