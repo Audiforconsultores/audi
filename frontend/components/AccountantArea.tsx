@@ -37,6 +37,7 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
   const [activeTab, setActiveTab] = useState<'holerite' | 'almoco' | 'ponto'>('holerite');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [tempoRestante, setTempoRestante] = useState<string>('07:00');
+  const [pontoParaConfirmar, setPontoParaConfirmar] = useState<'Entrada' | 'Intervalo' | 'Retorno' | 'Saída' | null>(null);
 
   useEffect(() => {
     const atualizarTimer = () => {
@@ -715,28 +716,28 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
 
                     <div className="grid grid-cols-2 gap-4 pt-2">
                       <button
-                        onClick={() => executarBaterPonto('Entrada')}
+                        onClick={() => setPontoParaConfirmar('Entrada')}
                         className="flex items-center justify-center gap-2 py-3 px-4 bg-white hover:bg-emerald-50 text-emerald-900 font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
                       >
                         <Fingerprint className="w-4 h-4 text-emerald-600" />
                         Entrada
                       </button>
                       <button
-                        onClick={() => executarBaterPonto('Intervalo')}
+                        onClick={() => setPontoParaConfirmar('Intervalo')}
                         className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-500/30 hover:bg-emerald-500/50 text-white border border-emerald-400/30 font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
                       >
                         <Clock className="w-4 h-4" />
                         Almoço
                       </button>
                       <button
-                        onClick={() => executarBaterPonto('Retorno')}
+                        onClick={() => setPontoParaConfirmar('Retorno')}
                         className="flex items-center justify-center gap-2 py-3 px-4 bg-emerald-500/30 hover:bg-emerald-500/50 text-white border border-emerald-400/30 font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
                       >
                         <Clock className="w-4 h-4" />
                         Retorno
                       </button>
                       <button
-                        onClick={() => executarBaterPonto('Saída')}
+                        onClick={() => setPontoParaConfirmar('Saída')}
                         className="flex items-center justify-center gap-2 py-3 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow transition-all transform hover:-translate-y-0.5"
                       >
                         <Fingerprint className="w-4 h-4" />
@@ -948,6 +949,57 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
                     <Download className="w-4 h-4" /> Baixar PDF
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Confirmação de Ponto */}
+        {pontoParaConfirmar && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 transform scale-100 transition-all duration-300">
+              <div className="flex items-center gap-4 text-emerald-600 mb-4">
+                <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
+                  <Fingerprint className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 leading-none">Confirmar Registro</h3>
+                  <p className="text-xs text-slate-500 mt-1">Ponto Eletrônico Audifor</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 mb-6 text-sm text-slate-700 leading-relaxed">
+                Você está prestes a registrar o ponto de:
+                <div className="flex items-center gap-2 mt-2 py-1.5 px-3 bg-white rounded-xl border border-slate-200/80 w-fit">
+                  <span className={`w-2.5 h-2.5 rounded-full ${
+                    pontoParaConfirmar === 'Entrada' ? 'bg-emerald-500' :
+                    pontoParaConfirmar === 'Saída' ? 'bg-rose-500' : 'bg-amber-500'
+                  }`}></span>
+                  <strong className="text-slate-900 font-extrabold">{pontoParaConfirmar}</strong>
+                </div>
+                <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Horário: <strong>{horaAtual}</strong> do dia <strong>{dataAtual}</strong></span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPontoParaConfirmar(null)}
+                  className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs md:text-sm border border-slate-200/50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    const tipo = pontoParaConfirmar;
+                    setPontoParaConfirmar(null);
+                    await executarBaterPonto(tipo);
+                  }}
+                  className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs md:text-sm shadow-lg shadow-emerald-600/30 transition-all"
+                >
+                  Confirmar
+                </button>
               </div>
             </div>
           </div>
