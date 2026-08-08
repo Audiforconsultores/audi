@@ -269,6 +269,11 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
 
       const estaNoRaioPermitido = distanciaCalculada <= RAIO_PERMITIDO_METROS;
 
+      if (!estaNoRaioPermitido) {
+        alert(`Acesso Negado: Registro de ponto bloqueado. Você está a ${distanciaCalculada} metros de distância, o que fica FORA DO RAIO máximo permitido (limite de ${RAIO_PERMITIDO_METROS} metros) da empresa Audifor Consultores.`);
+        return;
+      }
+
       // Salva no banco de dados do Supabase
       const { error } = await supabaseClient
         .from('time_records')
@@ -278,17 +283,12 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
           latitude: coordenadas.latitude,
           longitude: coordenadas.longitude,
           distance_meters: distanciaCalculada,
-          is_valid: estaNoRaioPermitido
+          is_valid: true
         }]);
 
       if (error) throw error;
 
-      if (estaNoRaioPermitido) {
-        setPontoSucesso(`Ponto de ${tipoRegistro} registrado com sucesso! Você está a ${distanciaCalculada}m do escritório.`);
-      } else {
-        alert(`Atenção: Seu ponto foi registrado, mas você está FORA DO RAIO permitido do escritório (${distanciaCalculada} metros de distância). O registro foi marcado como inválido para auditoria.`);
-        setPontoSucesso(`Ponto de ${tipoRegistro} registrado (Fora do Raio: ${distanciaCalculada}m)!`);
-      }
+      setPontoSucesso(`Ponto de ${tipoRegistro} registrado com sucesso! Você está a ${distanciaCalculada}m do escritório.`);
       
       setTimeout(() => {
         setPontoSucesso(null);
