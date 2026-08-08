@@ -196,7 +196,7 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
         // Pega as duas primeiras partes do nome e junta com underline
         const partesNome = emp.name.trim().split(/\s+/);
         const nomeFormatado = partesNome.slice(0, 2).join('_');
-        return `${nomeFormatado}.${extensao}`;
+        return `${nomeFormatado}_relatorio_ponto.${extensao}`;
       }
     }
     
