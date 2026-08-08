@@ -38,7 +38,7 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
   const [activeTab, setActiveTab] = useState<'holerite' | 'almoco' | 'ponto'>('holerite');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [tempoRestante, setTempoRestante] = useState<string>('07:00');
-  const [pontoParaConfirmar, setPontoParaConfirmar] = useState<'Entrada' | 'Intervalo' | 'Retorno' | 'Saída' | null>(null);
+  const [pontoParaConfirmar, setPontoParaConfirmar] = useState<'Entrada' | 'Almoço' | 'Retorno' | 'Saída' | null>(null);
 
   useEffect(() => {
     const atualizarTimer = () => {
@@ -64,7 +64,7 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
 
   interface RegistroPonto {
     id: string;
-    tipo: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída';
+    tipo: 'Entrada' | 'Almoço' | 'Retorno' | 'Saída';
     horario: string;
     dataRegistro: string;
     recordedAtRaw?: string;
@@ -96,20 +96,20 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
     return () => clearInterval(relogioIntervalo);
   }, []);
 
-  const deTipoBancoParaTipoFrontend = (tipo: string): 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída' => {
+  const deTipoBancoParaTipoFrontend = (tipo: string): 'Entrada' | 'Almoço' | 'Retorno' | 'Saída' => {
     switch (tipo) {
       case 'entrada': return 'Entrada';
-      case 'saida_almoco': return 'Intervalo';
+      case 'saida_almoco': return 'Almoço';
       case 'retorno_almoco': return 'Retorno';
       case 'saida': return 'Saída';
       default: return 'Entrada';
     }
   };
 
-  const deTipoFrontendParaTipoBanco = (tipo: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída'): string => {
+  const deTipoFrontendParaTipoBanco = (tipo: 'Entrada' | 'Almoço' | 'Retorno' | 'Saída'): string => {
     switch (tipo) {
       case 'Entrada': return 'entrada';
-      case 'Intervalo': return 'saida_almoco';
+      case 'Almoço': return 'saida_almoco';
       case 'Retorno': return 'retorno_almoco';
       case 'Saída': return 'saida';
     }
@@ -205,30 +205,64 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
     });
   };
 
-  const verificarBloqueioPonto = (tipo: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída'): { bloqueado: boolean } => {
-    const jaRegistrouHoje = historicoPontos.some(p => p.tipo === tipo && p.dataRegistro === dataAtual);
-    return { bloqueado: jaRegistrouHoje };
+  const verificarBloqueioPonto = (tipo: 'Entrada' | 'Almoço' | 'Retorno' | 'Saída'): { bloqueado: boolean; motivo?: string } => {
+    const jaTemEntrada = historicoPontos.some(p => p.tipo === 'Entrada' && p.dataRegistro === dataAtual);
+    const jaTemAlmoco = historicoPontos.some(p => p.tipo === 'Almoço' && p.dataRegistro === dataAtual);
+    const jaTemRetorno = historicoPontos.some(p => p.tipo === 'Retorno' && p.dataRegistro === dataAtual);
+    const jaTemSaida = historicoPontos.some(p => p.tipo === 'Saída' && p.dataRegistro === dataAtual);
+
+    switch (tipo) {
+      case 'Entrada':
+        if (jaTemEntrada) {
+          return { bloqueado: true, motivo: 'Registrado hoje' };
+        }
+        return { bloqueado: false };
+      case 'Almoço':
+        if (jaTemAlmoco) {
+          return { bloqueado: true, motivo: 'Registrado hoje' };
+        }
+        if (!jaTemEntrada) {
+          return { bloqueado: true, motivo: 'Aguardando Entrada' };
+        }
+        return { bloqueado: false };
+      case 'Retorno':
+        if (jaTemRetorno) {
+          return { bloqueado: true, motivo: 'Registrado hoje' };
+        }
+        if (!jaTemAlmoco) {
+          return { bloqueado: true, motivo: 'Aguardando Almoço' };
+        }
+        return { bloqueado: false };
+      case 'Saída':
+        if (jaTemSaida) {
+          return { bloqueado: true, motivo: 'Registrado hoje' };
+        }
+        if (!jaTemRetorno) {
+          return { bloqueado: true, motivo: 'Aguardando Retorno' };
+        }
+        return { bloqueado: false };
+    }
   };
 
   const renderizarBotaoPonto = (
-    tipo: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída',
+    tipo: 'Entrada' | 'Almoço' | 'Retorno' | 'Saída',
     icone: React.ReactNode,
     classeEstiloAtivo: string
   ) => {
-    const { bloqueado } = verificarBloqueioPonto(tipo);
+    const { bloqueado, motivo } = verificarBloqueioPonto(tipo);
 
     if (bloqueado) {
       return (
         <button
           disabled
           className="flex flex-col items-center justify-center gap-0.5 py-2 px-4 bg-emerald-950/20 text-emerald-300/40 border border-emerald-800/20 rounded-xl cursor-not-allowed opacity-60 text-xs md:text-sm font-bold w-full"
-          title={`Você já registrou ${tipo} hoje.`}
+          title={`Você não pode registrar ${tipo} agora.`}
         >
           <div className="flex items-center gap-1.5">
             <Lock className="w-3.5 h-3.5" />
             <span>{tipo}</span>
           </div>
-          <span className="text-[9px] font-normal">Registrado hoje</span>
+          <span className="text-[9px] font-normal">{motivo || 'Indisponível'}</span>
         </button>
       );
     }
@@ -244,7 +278,7 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
     );
   };
 
-  const executarBaterPonto = async (tipoRegistro: 'Entrada' | 'Intervalo' | 'Retorno' | 'Saída') => {
+  const executarBaterPonto = async (tipoRegistro: 'Entrada' | 'Almoço' | 'Retorno' | 'Saída') => {
     try {
       const token = await getToken({ template: 'supabase' });
       if (!token) {
@@ -763,7 +797,7 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
                         'bg-white hover:bg-emerald-50 text-emerald-900'
                       )}
                       {renderizarBotaoPonto(
-                        'Intervalo', 
+                        'Almoço', 
                         <Clock className="w-4 h-4 text-amber-500" />, 
                         'bg-emerald-500/30 hover:bg-emerald-500/50 text-white border border-emerald-400/30'
                       )}

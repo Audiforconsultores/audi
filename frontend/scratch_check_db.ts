@@ -5,16 +5,20 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const main = async () => {
   const supabase = createClient(supabaseUrl, supabaseKey);
-  const { data: employees, error: errEmp } = await supabase.from('employees').select('*');
-  const { data: timeRecords, error: errTr } = await supabase.from('time_records').select('*');
+  
+  console.log('Deletando registros de ponto para user_3HcNGeWiLBruTAZMw4ezD3D6dKS...');
+  
+  const { data, error } = await supabase
+    .from('time_records')
+    .delete()
+    .eq('clerk_id', 'user_3HcNGeWiLBruTAZMw4ezD3D6dKS')
+    .select(); // Retorna o que foi deletado
 
-  console.log('--- EMPLOYEES ---');
-  if (errEmp) console.error(errEmp);
-  else console.log(employees);
-
-  console.log('--- TIME RECORDS ---');
-  if (errTr) console.error(errTr);
-  else console.log(timeRecords);
+  if (error) {
+    console.error('Erro ao deletar:', error);
+  } else {
+    console.log('Sucesso! Registros deletados:', data);
+  }
 };
 
 main();
