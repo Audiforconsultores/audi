@@ -186,6 +186,23 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
     }
   };
 
+  const obterNomeArquivoExportacao = (extensao: string) => {
+    const registros = registrosParaExportar;
+    const clerkIdsUnicos = Array.from(new Set(registros.map(r => r.clerk_id)));
+    
+    if (clerkIdsUnicos.length === 1) {
+      const emp = employees.find(e => e.clerk_id === clerkIdsUnicos[0]);
+      if (emp) {
+        // Pega as duas primeiras partes do nome e junta com underline
+        const partesNome = emp.name.trim().split(/\s+/);
+        const nomeFormatado = partesNome.slice(0, 2).join('_');
+        return `${nomeFormatado}.${extensao}`;
+      }
+    }
+    
+    return `relatorio_pontos_${new Date().toISOString().split('T')[0]}.${extensao}`;
+  };
+
   const exportarCSV = () => {
     const registros = registrosParaExportar;
     if (registros.length === 0) {
@@ -211,7 +228,7 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `relatorio_pontos_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', obterNomeArquivoExportacao('csv'));
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -240,7 +257,7 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `relatorio_pontos_${new Date().toISOString().split('T')[0]}.txt`;
+    link.download = obterNomeArquivoExportacao('txt');
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -268,7 +285,7 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
     const worksheet = XLSX.utils.json_to_sheet(dadosExcel);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Pontos');
-    XLSX.writeFile(workbook, `relatorio_pontos_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(workbook, obterNomeArquivoExportacao('xlsx'));
   };
 
   const exportarGoogleSheets = async () => {
