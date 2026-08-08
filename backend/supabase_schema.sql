@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS employees (
   email TEXT NOT NULL UNIQUE,
   is_active BOOLEAN DEFAULT TRUE,
   is_admin BOOLEAN DEFAULT FALSE, -- Controle de permissão administrativa
+  allow_home_office BOOLEAN DEFAULT FALSE, -- Ignora geocerca se TRUE (Home Office)
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

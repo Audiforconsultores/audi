@@ -42,6 +42,7 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
   const [activeTab, setActiveTab] = useState<'holerite' | 'almoco' | 'ponto'>('holerite');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [tempoRestante, setTempoRestante] = useState<string>('07:00');
+  const [permitirHomeOffice, setPermitirHomeOffice] = useState(false);
   const [pontoParaConfirmar, setPontoParaConfirmar] = useState<'Entrada' | 'Almoço' | 'Retorno' | 'Saída' | null>(null);
   const [fotoCapturada, setFotoCapturada] = useState<string | null>(null);
   const [mostrandoCapturaFacial, setMostrandoCapturaFacial] = useState(false);
@@ -191,6 +192,18 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
           .order('recorded_at', { ascending: false });
 
         if (error) throw error;
+
+        // Busca se o usuário logado tem permissão para bater ponto remoto (Home Office)
+        if (user?.id) {
+          const { data: empData } = await supabaseClient
+            .from('employees')
+            .select('allow_home_office')
+            .eq('clerk_id', user.id)
+            .maybeSingle();
+          if (empData) {
+            setPermitirHomeOffice(empData.allow_home_office || false);
+          }
+        }
 
         if (data) {
           const pontosFormatados: RegistroPonto[] = data.map((item: any) => {
@@ -370,7 +383,7 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
         LONGITUDE_ESCRITORIO
       );
 
-      const estaNoRaioPermitido = DESATIVAR_GEOFENCING || (distanciaCalculada <= RAIO_PERMITIDO_METROS);
+      const estaNoRaioPermitido = permitirHomeOffice || DESATIVAR_GEOFENCING || (distanciaCalculada <= RAIO_PERMITIDO_METROS);
 
       if (!estaNoRaioPermitido) {
         alert(`Acesso Negado: Registro de ponto bloqueado. Você está a ${distanciaCalculada} metros de distância, o que fica FORA DO RAIO máximo permitido (limite de ${RAIO_PERMITIDO_METROS} metros) da empresa Audifor Consultores.`);

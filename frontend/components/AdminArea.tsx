@@ -27,11 +27,13 @@ interface AdminAreaProps {
 }
 
 interface Employee {
+  id?: string;
   clerk_id: string;
   name: string;
   email: string;
   is_active: boolean;
   is_admin: boolean;
+  allow_home_office: boolean;
   created_at: string;
 }
 
@@ -57,7 +59,7 @@ interface EmployeePhoto {
 export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
   const { getToken } = useAuth();
   const { user } = useUser();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'reports' | 'settings'>('dashboard');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [timeRecords, setTimeRecords] = useState<TimeRecord[]>([]);
   const [photos, setPhotos] = useState<EmployeePhoto[]>([]);
@@ -391,6 +393,14 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
               }`}
             >
               Relatório de Batidas
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'settings' ? 'bg-red-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              Configurações
             </button>
           </div>
         </div>
@@ -804,6 +814,77 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: CONFIGURAÇÕES */}
+            {activeTab === 'settings' && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+                <div className="border-b border-slate-100 pb-4">
+                  <h2 className="text-lg font-black text-slate-900">Configuração de Permissão de Batida (Home Office)</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Selecione quais colaboradores podem bater o ponto remotamente (Home Office). Colaboradores com essa opção ativa terão a geocerca (bloqueio de distância de 100m) desativada individualmente. Os demais devem bater o ponto obrigatoriamente do escritório.
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase border-b border-slate-100">
+                        <th className="py-3 px-5">Colaborador</th>
+                        <th className="py-3 px-5">Email</th>
+                        <th className="py-3 px-5">Perfil</th>
+                        <th className="py-3 px-5 text-right">Permitir Ponto Remoto / Home Office</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs md:text-sm">
+                      {employees.map(emp => (
+                        <tr key={emp.id} className="hover:bg-slate-50/30 transition-colors">
+                          <td className="py-4 px-5">
+                            <strong className="text-slate-900 block font-extrabold">{emp.name}</strong>
+                          </td>
+                          <td className="py-4 px-5 text-slate-500 font-medium">
+                            {emp.email}
+                          </td>
+                          <td className="py-4 px-5">
+                            <span className={`inline-flex items-center gap-1 py-0.5 px-2.5 rounded-full text-[10px] font-bold ${
+                              emp.is_admin ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}>
+                              {emp.is_admin ? 'Administrador' : 'Colaborador'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-5 text-right flex justify-end">
+                            <label className="relative inline-flex items-center cursor-pointer select-none">
+                              <input 
+                                type="checkbox" 
+                                checked={emp.allow_home_office || false}
+                                onChange={async (e) => {
+                                  const novoValor = e.target.checked;
+                                  // Atualiza localmente
+                                  setEmployees(prev => prev.map(item => item.id === emp.id ? { ...item, allow_home_office: novoValor } : item));
+                                  // Atualiza no Supabase
+                                  try {
+                                    const token = await getToken({ template: 'supabase' });
+                                    if (!token) return;
+                                    const supabaseClient = obterSupabaseClient(token);
+                                    await supabaseClient
+                                      .from('employees')
+                                      .update({ allow_home_office: novoValor })
+                                      .eq('id', emp.id);
+                                  } catch (err) {
+                                    console.error('Erro ao atualizar permissao de Home Office:', err);
+                                  }
+                                }}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-350 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                            </label>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
