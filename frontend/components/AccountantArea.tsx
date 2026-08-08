@@ -162,6 +162,25 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
     }
   }, [isSignedIn, dataAtual, pontoSucesso]);
 
+  const LATITUDE_ESCRITORIO = -15.5840;
+  const LONGITUDE_ESCRITORIO = -56.0720;
+  const RAIO_PERMITIDO_METROS = 100; // 100 metros de tolerância
+
+  const calcularDistanciaMetros = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371e3; // Raio da Terra em metros
+    const phi1 = lat1 * Math.PI / 180;
+    const phi2 = lat2 * Math.PI / 180;
+    const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+    const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+              Math.cos(phi1) * Math.cos(phi2) *
+              Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return Math.round(R * c); // Distância em metros
+  };
+
   const obterGeolocalizacao = (): Promise<{ latitude: number; longitude: number }> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
@@ -192,6 +211,21 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
       const supabaseClient = obterSupabaseClient(token);
       const coordenadas = await obterGeolocalizacao();
 
+      if (coordenadas.latitude === 0 && coordenadas.longitude === 0) {
+        alert('Erro: É necessário permitir o acesso à localização para registrar o ponto.');
+        return;
+      }
+
+      // Calcular a distância do escritório
+      const distanciaCalculada = calcularDistanciaMetros(
+        coordenadas.latitude,
+        coordenadas.longitude,
+        LATITUDE_ESCRITORIO,
+        LONGITUDE_ESCRITORIO
+      );
+
+      const estaNoRaioPermitido = distanciaCalculada <= RAIO_PERMITIDO_METROS;
+
       // Salva no banco de dados do Supabase
       const { error } = await supabaseClient
         .from('time_records')
@@ -200,16 +234,22 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome }) 
           record_type: deTipoFrontendParaTipoBanco(tipoRegistro),
           latitude: coordenadas.latitude,
           longitude: coordenadas.longitude,
-          is_valid: true
+          distance_meters: distanciaCalculada,
+          is_valid: estaNoRaioPermitido
         }]);
 
       if (error) throw error;
 
-      setPontoSucesso(`Ponto de ${tipoRegistro} registrado com sucesso às ${horaAtual}!`);
+      if (estaNoRaioPermitido) {
+        setPontoSucesso(`Ponto de ${tipoRegistro} registrado com sucesso! Você está a ${distanciaCalculada}m do escritório.`);
+      } else {
+        alert(`Atenção: Seu ponto foi registrado, mas você está FORA DO RAIO permitido do escritório (${distanciaCalculada} metros de distância). O registro foi marcado como inválido para auditoria.`);
+        setPontoSucesso(`Ponto de ${tipoRegistro} registrado (Fora do Raio: ${distanciaCalculada}m)!`);
+      }
       
       setTimeout(() => {
         setPontoSucesso(null);
-      }, 4000);
+      }, 5000);
 
     } catch (erro: any) {
       console.error('Erro ao registrar ponto no Supabase:', erro);
