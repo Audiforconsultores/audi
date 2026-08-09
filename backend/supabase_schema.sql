@@ -72,6 +72,12 @@ CREATE POLICY "Admins can select all employees" ON employees
   FOR SELECT
   USING (public.is_admin());
 
+-- 3. Administradores podem atualizar os dados dos colaboradores (como Home Office)
+CREATE POLICY "Admins can update all employees" ON employees
+  FOR UPDATE
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
 -- Políticas para a tabela TIME_RECORDS:
 -- 1. Colaboradores podem criar (INSERT) suas próprias batidas de ponto
 CREATE POLICY "Employees can insert their own time records" ON time_records
