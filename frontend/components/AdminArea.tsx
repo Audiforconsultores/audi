@@ -65,6 +65,8 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
   const [photos, setPhotos] = useState<EmployeePhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
+  const [draftHomeOffice, setDraftHomeOffice] = useState<Record<string, boolean>>({});
+  const [salvandoConfig, setSalvandoConfig] = useState(false);
   
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');
@@ -315,6 +317,32 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
     } catch (err) {
       console.error('Erro ao copiar para clipboard:', err);
       alert('Erro ao copiar para a área de transferência.');
+    }
+  };
+
+  const salvarConfiguracoesHomeOffice = async () => {
+    setSalvandoConfig(true);
+    try {
+      const token = await getToken({ template: 'supabase' });
+      if (!token) return;
+      const supabaseClient = obterSupabaseClient(token);
+
+      const promessas = Object.entries(draftHomeOffice).map(([clerkId, allow]) => {
+        return supabaseClient
+          .from('employees')
+          .update({ allow_home_office: allow })
+          .eq('clerk_id', clerkId);
+      });
+
+      await Promise.all(promessas);
+      setDraftHomeOffice({});
+      await carregarDados();
+      alert('Configurações de Home Office salvas com sucesso!');
+    } catch (err) {
+      console.error('Erro ao salvar configurações de Home Office:', err);
+      alert('Erro ao salvar as configurações.');
+    } finally {
+      setSalvandoConfig(false);
     }
   };
 
@@ -839,52 +867,74 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-xs md:text-sm">
-                      {employees.map(emp => (
-                        <tr key={emp.id} className="hover:bg-slate-50/30 transition-colors">
-                          <td className="py-4 px-5">
-                            <strong className="text-slate-900 block font-extrabold">{emp.name}</strong>
-                          </td>
-                          <td className="py-4 px-5 text-slate-500 font-medium">
-                            {emp.email}
-                          </td>
-                          <td className="py-4 px-5">
-                            <span className={`inline-flex items-center gap-1 py-0.5 px-2.5 rounded-full text-[10px] font-bold ${
-                              emp.is_admin ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
-                            }`}>
-                              {emp.is_admin ? 'Administrador' : 'Colaborador'}
-                            </span>
-                          </td>
-                          <td className="py-4 px-5 text-right flex justify-end">
-                            <label className="relative inline-flex items-center cursor-pointer select-none">
-                              <input 
-                                type="checkbox" 
-                                checked={emp.allow_home_office || false}
-                                onChange={async (e) => {
-                                  const novoValor = e.target.checked;
-                                  // Atualiza localmente
-                                  setEmployees(prev => prev.map(item => item.id === emp.id ? { ...item, allow_home_office: novoValor } : item));
-                                  // Atualiza no Supabase
-                                  try {
-                                    const token = await getToken({ template: 'supabase' });
-                                    if (!token) return;
-                                    const supabaseClient = obterSupabaseClient(token);
-                                    await supabaseClient
-                                      .from('employees')
-                                      .update({ allow_home_office: novoValor })
-                                      .eq('id', emp.id);
-                                  } catch (err) {
-                                    console.error('Erro ao atualizar permissao de Home Office:', err);
-                                  }
-                                }}
-                                className="sr-only peer"
-                              />
-                              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-350 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                            </label>
-                          </td>
-                        </tr>
-                      ))}
+                      {employees.map(emp => {
+                        const isInDraft = draftHomeOffice[emp.clerk_id] !== undefined;
+                        const valorAtual = isInDraft ? draftHomeOffice[emp.clerk_id] : (emp.allow_home_office || false);
+
+                        return (
+                          <tr key={emp.clerk_id} className="hover:bg-slate-50/30 transition-colors">
+                            <td className="py-4 px-5">
+                              <strong className="text-slate-900 block font-extrabold">{emp.name}</strong>
+                            </td>
+                            <td className="py-4 px-5 text-slate-500 font-medium">
+                              {emp.email}
+                            </td>
+                            <td className="py-4 px-5">
+                              <span className={`inline-flex items-center gap-1 py-0.5 px-2.5 rounded-full text-[10px] font-bold ${
+                                emp.is_admin ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                              }`}>
+                                {emp.is_admin ? 'Administrador' : 'Colaborador'}
+                              </span>
+                            </td>
+                            <td className="py-4 px-5 text-right flex justify-end">
+                              <label className="relative inline-flex items-center cursor-pointer select-none">
+                                <input 
+                                  type="checkbox" 
+                                  checked={valorAtual}
+                                  onChange={(e) => {
+                                    const novoValor = e.target.checked;
+                                    setDraftHomeOffice(prev => ({
+                                      ...prev,
+                                      [emp.clerk_id]: novoValor
+                                    }));
+                                  }}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-350 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                              </label>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Save configurations footer bar */}
+                <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
+                  {Object.keys(draftHomeOffice).length > 0 && (
+                    <button
+                      onClick={() => setDraftHomeOffice({})}
+                      disabled={salvandoConfig}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+                    >
+                      Descartar Alterações
+                    </button>
+                  )}
+                  <button
+                    onClick={salvarConfiguracoesHomeOffice}
+                    disabled={salvandoConfig || Object.keys(draftHomeOffice).length === 0}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow transition-colors"
+                  >
+                    {salvandoConfig ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Salvando...</span>
+                      </>
+                    ) : (
+                      <span>Salvar Configurações ({Object.keys(draftHomeOffice).length})</span>
+                    )}
+                  </button>
                 </div>
               </div>
             )}
