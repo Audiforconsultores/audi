@@ -6,18 +6,14 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const main = async () => {
   const supabase = createClient(supabaseUrl, supabaseKey);
   
-  console.log('Deletando registros de ponto para user_3HcNGeWiLBruTAZMw4ezD3D6dKS...');
-  
   const { data, error } = await supabase
-    .from('time_records')
-    .delete()
-    .eq('clerk_id', 'user_3HcNGeWiLBruTAZMw4ezD3D6dKS')
-    .select(); // Retorna o que foi deletado
+    .from('employees')
+    .select('*');
 
   if (error) {
-    console.error('Erro ao deletar:', error);
+    console.error('Erro ao buscar:', error);
   } else {
-    console.log('Sucesso! Registros deletados:', data);
+    console.log('Sucesso! Colaboradores no Banco:', data);
   }
 };
 
