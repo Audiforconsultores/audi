@@ -576,6 +576,13 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
                   </div>
                 </div>
 
+                <div className="mb-5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs flex items-start gap-2.5">
+                  <Lock className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                  <p className="leading-normal">
+                    <strong>Atenção:</strong> Apenas o e-mail corporativo institucional poderá ser utilizado para acesso a este portal. Cadastros com e-mails pessoais ou externos serão automaticamente rejeitados pelo servidor.
+                  </p>
+                </div>
+
                 <div className="flex justify-center py-2 w-full">
                   {authMode === 'signin' ? (
                     <SignIn 

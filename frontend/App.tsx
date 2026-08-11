@@ -68,7 +68,7 @@ const App: React.FC = () => {
     if (isSignedIn) {
       const email = user?.primaryEmailAddress?.emailAddress || '';
       if (email && !email.endsWith('@audifor.com.br')) {
-        alert('Acesso negado: Apenas e-mails do domínio @audifor.com.br são permitidos para acessar a Área do Contador.');
+        alert('Acesso negado: Apenas e-mails corporativos autorizados são permitidos para acessar a Área do Contador.');
         clerk.signOut();
         setCurrentView('home');
         return;
