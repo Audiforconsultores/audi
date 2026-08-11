@@ -93,6 +93,7 @@ CREATE OR REPLACE FUNCTION public.processar_time_record()
 RETURNS TRIGGER AS $$
 DECLARE
   v_allow_home_office boolean;
+  v_is_active boolean;
   v_distancia double precision;
   v_raio_permitido double precision := 100.0; -- Limite de 100 metros
   v_lat_escritorio double precision := -15.5840; -- Latitude do escritório Audifor
@@ -102,12 +103,12 @@ BEGIN
   NEW.recorded_at := NOW();
 
   -- 2. Obter configuração do colaborador
-  SELECT allow_home_office INTO v_allow_home_office
+  SELECT allow_home_office, is_active INTO v_allow_home_office, v_is_active
   FROM employees
   WHERE clerk_id = NEW.clerk_id;
 
-  IF v_allow_home_office IS NULL THEN
-    RAISE EXCEPTION 'Colaborador com clerk_id % não encontrado no banco de dados.', NEW.clerk_id;
+  IF v_is_active IS NULL OR NOT v_is_active THEN
+    RAISE EXCEPTION 'Acesso Negado: Colaborador inativo ou não cadastrado no sistema.';
   END IF;
 
   -- 3. Se for Home Office, liberar sem validar raio e fixar distância como 0

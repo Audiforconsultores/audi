@@ -32,11 +32,12 @@ import {
 interface AccountantAreaProps {
   onBackToHome: () => void;
   onGoToAdmin?: () => void;
+  isAdmin?: boolean;
 }
 
 const LUNCH_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScbyjT_dmxjjrid1w_619BrGoAlk9vmRLAz51W4W-RysyvzsQ/viewform';
 
-export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, onGoToAdmin }) => {
+export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, onGoToAdmin, isAdmin }) => {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState<'holerite' | 'almoco' | 'ponto'>('holerite');
@@ -650,23 +651,16 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
                 <span>Site Principal</span>
               </button>
 
-              {(() => {
-                const emailsAdmin = ['adm@audifor.com.br', 'controller@audifor.com.br'];
-                const ehAdmin = emailsAdmin.includes(user?.primaryEmailAddress?.emailAddress?.toLowerCase() || '');
-                if (ehAdmin && onGoToAdmin) {
-                  return (
-                    <button 
-                      onClick={onGoToAdmin}
-                      className="flex items-center gap-1.5 text-xs text-red-200 hover:text-white bg-red-950/40 hover:bg-red-950/80 px-3 py-1.5 rounded-lg border border-red-800/40 transition-colors"
-                      title="Acessar Painel Administrativo de Auditoria"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 text-red-400" />
-                      <span>Painel Admin</span>
-                    </button>
-                  );
-                }
-                return null;
-              })()}
+              {isAdmin && onGoToAdmin && (
+                <button 
+                  onClick={onGoToAdmin}
+                  className="flex items-center gap-1.5 text-xs text-red-200 hover:text-white bg-red-950/40 hover:bg-red-950/80 px-3 py-1.5 rounded-lg border border-red-800/40 transition-colors"
+                  title="Acessar Painel Administrativo de Auditoria"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-red-400" />
+                  <span>Painel Admin</span>
+                </button>
+              )}
 
               <div className="h-6 w-[1px] bg-ocean-700 hidden sm:block"></div>
 

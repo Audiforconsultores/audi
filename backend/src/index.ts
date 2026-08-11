@@ -71,9 +71,26 @@ app.post('/api/webhooks/clerk', express.raw({ type: 'application/json' }), async
     const email = emailObj ? emailObj.email_address : '';
     const nome = `${dadosEvento.first_name || ''} ${dadosEvento.last_name || ''}`.trim() || 'Usuário Sem Nome';
 
+    // SEC-04: Validar se o e-mail pertence ao domínio permitido
+    const emailValido = email.toLowerCase().endsWith('@audifor.com.br');
+
     if (supabase) {
       try {
-        const emailsAdmin = ['adm@audifor.com.br', 'controller@audifor.com.br'];
+        if (!emailValido) {
+          console.warn(`[Webhook] Ignorando sincronização para e-mail fora do domínio permitido: ${email}`);
+          // Se o usuário foi alterado para um e-mail fora do domínio, removemos ele do banco por segurança
+          const { error: deleteError } = await supabase
+            .from('employees')
+            .delete()
+            .eq('clerk_id', clerkId);
+          
+          if (deleteError) throw deleteError;
+          console.log(`[Webhook] Registro de colaborador limpo/removido para o clerk_id ${clerkId}`);
+          return res.status(200).json({ recebido: true, ignorado: true, motivo: 'Domínio de e-mail inválido.' });
+        }
+
+        const emailsAdminEnv = process.env.ADMIN_EMAILS || 'adm@audifor.com.br,controller@audifor.com.br';
+        const emailsAdmin = emailsAdminEnv.split(',').map((e: string) => e.trim().toLowerCase());
         const ehAdmin = emailsAdmin.includes(email.toLowerCase());
 
         const { error } = await supabase
