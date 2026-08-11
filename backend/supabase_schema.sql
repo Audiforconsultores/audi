@@ -96,8 +96,8 @@ DECLARE
   v_is_active boolean;
   v_distancia double precision;
   v_raio_permitido double precision := 100.0; -- Limite de 100 metros
-  v_lat_escritorio double precision := -15.5840; -- Latitude do escritório Audifor
-  v_lon_escritorio double precision := -56.0720; -- Longitude do escritório Audifor
+  v_lat_escritorio double precision := -15.62964; -- Latitude do escritório Audifor (Jardim Califórnia)
+  v_lon_escritorio double precision := -56.07198; -- Longitude do escritório Audifor (Jardim Califórnia)
 BEGIN
   -- 1. Forçar horário do servidor
   NEW.recorded_at := NOW();

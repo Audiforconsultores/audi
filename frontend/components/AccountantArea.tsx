@@ -242,8 +242,8 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
   // CONFIGURAÇÃO DE TESTE: Altere para false para reativar o geofencing (bloqueio por distância)
   const DESATIVAR_GEOFENCING = false;
 
-  const LATITUDE_ESCRITORIO = -15.5840;
-  const LONGITUDE_ESCRITORIO = -56.0720;
+  const LATITUDE_ESCRITORIO = -15.62964;
+  const LONGITUDE_ESCRITORIO = -56.07198;
   const RAIO_PERMITIDO_METROS = 100; // 100 metros de tolerância
 
   const calcularDistanciaMetros = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
