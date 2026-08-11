@@ -11,10 +11,7 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('employee-photos', 'employee-photos', true)
 ON CONFLICT (id) DO NOTHING;
 
--- 2. GARANTIR QUE RLS ESTÁ ATIVO NA TABELA DE ARQUIVOS
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
--- 3. LIMPEZA DE POLÍTICAS ANTERIORES DO BUCKET (Caso existam)
+-- 2. LIMPEZA DE POLÍTICAS ANTERIORES DO BUCKET (Caso existam)
 DROP POLICY IF EXISTS "Allow employees to upload photos" ON storage.objects;
 DROP POLICY IF EXISTS "Allow admins to read photos" ON storage.objects;
 

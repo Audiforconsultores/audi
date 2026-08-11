@@ -216,8 +216,6 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('employee-photos', 'employee-photos', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Habilitar RLS na tabela de arquivos de storage
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- Política de upload (apenas colaboradores autenticados na própria pasta)
 CREATE POLICY "Allow employees to upload photos" ON storage.objects
