@@ -11,7 +11,26 @@ dotenv.config({ path: path.resolve(process.cwd(), '../.env.local') });
 const app = express();
 const porta = process.env.PORT || 3001;
 
-app.use(cors());
+const origensPermitidas = [
+  'http://localhost:3002',
+  'http://127.0.0.1:3002',
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
+];
+
+app.use(cors({
+  origin: (origem, callback) => {
+    // Permitir requisições sem origem (como chamadas de servidor para servidor, ex: webhooks do Clerk)
+    if (!origem) return callback(null, true);
+    if (origensPermitidas.includes(origem)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Bloqueado pela política de CORS da Audifor'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'svix-id', 'svix-timestamp', 'svix-signature'],
+  credentials: true
+}));
 
 // Instanciar Clerk Backend SDK para validações seguras
 const clerkSecretKey = process.env.CLERK_SECRET_KEY || '';
