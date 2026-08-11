@@ -207,3 +207,33 @@ CREATE POLICY "Admins can select all photos" ON employee_photos
   FOR SELECT
   USING (public.is_admin());
 
+-- =======================================================
+-- 4. CONFIGURAÇÃO DE SUPABASE STORAGE (BUCKETS & POLICIES)
+-- =======================================================
+
+-- Criar o bucket de fotos se não existir
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('employee-photos', 'employee-photos', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Habilitar RLS na tabela de arquivos de storage
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- Política de upload (apenas colaboradores autenticados na própria pasta)
+CREATE POLICY "Allow employees to upload photos" ON storage.objects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'employee-photos' AND
+    (storage.foldername(name))[1] = public.clerk_user_id()
+  );
+
+-- Política de leitura (apenas administradores podem visualizar fotos)
+CREATE POLICY "Allow admins to read photos" ON storage.objects
+  FOR SELECT
+  TO authenticated
+  USING (
+    bucket_id = 'employee-photos' AND
+    public.is_admin()
+  );
+

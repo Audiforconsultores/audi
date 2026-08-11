@@ -362,6 +362,18 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
   };
 
   const executarBaterPonto = async (tipoRegistro: 'Entrada' | 'Almoço' | 'Retorno' | 'Saída') => {
+    const converterBase64ParaBlob = (base64: string): Blob => {
+      const partes = base64.split(';base64,');
+      const tipoMime = partes[0].split(':')[1];
+      const raw = window.atob(partes[1]);
+      const tamanhoRaw = raw.length;
+      const uInt8Array = new Uint8Array(tamanhoRaw);
+      for (let i = 0; i < tamanhoRaw; ++i) {
+        uInt8Array[i] = raw.charCodeAt(i);
+      }
+      return new Blob([uInt8Array], { type: tipoMime });
+    };
+
     try {
       const token = await getToken({ template: 'supabase' });
       if (!token) {
@@ -409,16 +421,45 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
       // Se for Entrada, salva a foto de biometria na tabela dedicada 'employee_photos'
       if (tipoRegistro === 'Entrada' && fotoCapturada && recordData && recordData[0]) {
         const timeRecordId = recordData[0].id;
-        const { error: photoError } = await supabaseClient
-          .from('employee_photos')
-          .insert([{
-            clerk_id: user?.id,
-            time_record_id: timeRecordId,
-            photo_data: fotoCapturada
-          }]);
         
-        if (photoError) {
-          console.error('Erro ao salvar foto de biometria:', photoError);
+        try {
+          // 1. Converter Base64 para Blob binário
+          const blobFoto = converterBase64ParaBlob(fotoCapturada);
+          const caminhoArquivo = `${user?.id}/${timeRecordId}.jpg`;
+          
+          // 2. Fazer upload para o Supabase Storage Bucket 'employee-photos'
+          const { error: uploadError } = await supabaseClient
+            .storage
+            .from('employee-photos')
+            .upload(caminhoArquivo, blobFoto, {
+              contentType: 'image/jpeg',
+              upsert: true
+            });
+            
+          if (uploadError) throw uploadError;
+          
+          // 3. Obter URL pública do arquivo
+          const { data: urlData } = supabaseClient
+            .storage
+            .from('employee-photos')
+            .getPublicUrl(caminhoArquivo);
+            
+          const urlFoto = urlData.publicUrl;
+          
+          // 4. Inserir a URL na tabela de fotos
+          const { error: photoError } = await supabaseClient
+            .from('employee_photos')
+            .insert([{
+              clerk_id: user?.id,
+              time_record_id: timeRecordId,
+              photo_data: urlFoto
+            }]);
+            
+          if (photoError) throw photoError;
+          console.log('Foto de biometria enviada ao Supabase Storage e salva com sucesso.');
+        } catch (erroFoto: any) {
+          console.error('Erro ao processar/salvar foto de biometria no Storage:', erroFoto);
+          alert(`Aviso: O ponto foi registrado, mas houve um erro ao salvar sua foto de biometria: ${erroFoto.message || erroFoto}`);
         }
       }
 
