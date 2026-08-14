@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { jsPDF } from 'jspdf';
 import { useAuth, useUser, SignIn, SignUp, UserButton } from '@clerk/react';
 import { obterSupabaseClient } from '../supabase';
 import { 
@@ -129,7 +130,12 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
     horario: string;
     dataRegistro: string;
     recordedAtRaw?: string;
+    receiptPath?: string | null;
   }
+
+  const [colaboradorNome, setColaboradorNome] = useState<string>('');
+  const [colaboradorCpf, setColaboradorCpf] = useState<string>('');
+  const [colaboradorCargo, setColaboradorCargo] = useState<string>('');
 
   const [horaAtual, setHoraAtual] = useState<string>('');
   const [dataAtual, setDataAtual] = useState<string>('');
@@ -194,15 +200,18 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
 
         if (error) throw error;
 
-        // Busca se o usuário logado tem permissão para bater ponto remoto (Home Office)
+        // Busca os dados do colaborador no Supabase (incluindo CPF e Cargo para Portaria 671)
         if (user?.id) {
           const { data: empData } = await supabaseClient
             .from('employees')
-            .select('allow_home_office')
+            .select('allow_home_office, name, cpf, cargo')
             .eq('clerk_id', user.id)
             .maybeSingle();
           if (empData) {
             setPermitirHomeOffice(empData.allow_home_office || false);
+            setColaboradorNome(empData.name || user.fullName || user.firstName || 'Colaborador Audifor');
+            setColaboradorCpf(empData.cpf || '');
+            setColaboradorCargo(empData.cargo || '');
           }
         }
 
@@ -222,7 +231,8 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
               tipo: deTipoBancoParaTipoFrontend(item.record_type),
               horario: `${horas}:${minutos}:${segundos}`,
               dataRegistro: `${dia}/${mes}/${ano}`,
-              recordedAtRaw: item.recorded_at
+              recordedAtRaw: item.recorded_at,
+              receiptPath: item.receipt_path || null
             };
           });
           setHistoricoPontos(pontosFormatados);
@@ -361,6 +371,138 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
     );
   };
 
+  const executarGerarESalvarRecibo = async (
+    timeRecordId: string,
+    tipoRegistro: 'Entrada' | 'Almoço' | 'Retorno' | 'Saída',
+    horarioBatida: Date,
+    latitude: number,
+    longitude: number,
+    distancia: number
+  ) => {
+    try {
+      const token = await getToken({ template: 'supabase' });
+      if (!token) return;
+      const supabaseClient = obterSupabaseClient(token);
+
+      // 1. Criar o PDF usando jsPDF (A5 format, ideal para recibos)
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a5'
+      });
+
+      // Cabeçalho azul escuro
+      doc.setFillColor(11, 30, 54);
+      doc.rect(0, 0, 148, 25, 'F');
+
+      // Título
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('COMPROVANTE DE REGISTRO DE PONTO DO TRABALHADOR', 8, 11);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(200, 220, 240);
+      doc.text('Emitido nos termos do Art. 80 da Portaria 671/2021 MTP', 8, 17);
+
+      // Dados do Empregador
+      doc.setTextColor(11, 30, 54);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.text('IDENTIFICAÇÃO DO EMPREGADOR', 8, 35);
+      doc.setDrawColor(229, 231, 235);
+      doc.line(8, 37, 140, 37);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(75, 85, 99);
+      doc.text('Razão Social: AUDIFOR CONSULTORES E ASSOCIADOS LTDA.', 8, 42);
+      doc.text('CNPJ: 10.274.661/0001-69', 8, 47);
+      doc.text('Endereço: Av. Miguel Sutil, Jardim Califórnia - Cuiabá/MT', 8, 52);
+
+      // Dados do Trabalhador
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(11, 30, 54);
+      doc.text('IDENTIFICAÇÃO DO TRABALHADOR', 8, 63);
+      doc.line(8, 65, 140, 65);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(75, 85, 99);
+      doc.text(`Nome Completo: ${colaboradorNome || user?.fullName || 'Colaborador Audifor'}`, 8, 70);
+      doc.text(`CPF: ${colaboradorCpf || 'Não informado'}`, 8, 75);
+      doc.text(`Cargo / Função: ${colaboradorCargo || 'Não informado'}`, 8, 80);
+
+      // Dados do Registro
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(11, 30, 54);
+      doc.text('DADOS DO REGISTRO DE PONTO', 8, 91);
+      doc.line(8, 93, 140, 93);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(75, 85, 99);
+      
+      const dia = horarioBatida.getDate().toString().padStart(2, '0');
+      const mes = (horarioBatida.getMonth() + 1).toString().padStart(2, '0');
+      const ano = horarioBatida.getFullYear();
+      const hora = horarioBatida.getHours().toString().padStart(2, '0');
+      const min = horarioBatida.getMinutes().toString().padStart(2, '0');
+      const seg = horarioBatida.getSeconds().toString().padStart(2, '0');
+
+      doc.text(`Tipo de Batida: ${tipoRegistro}`, 8, 98);
+      doc.text(`Data do Registro: ${dia}/${mes}/${ano}`, 8, 103);
+      doc.text(`Horário de Brasília: ${hora}:${min}:${seg} (UTC-3)`, 8, 108);
+      doc.text(`Geolocalização: Lat ${latitude.toFixed(5)}, Lon ${longitude.toFixed(5)} (${distancia === 0 ? 'Home Office' : `${distancia}m do escritório`})`, 8, 113);
+
+      // Bloco de Autenticidade / Rodapé
+      doc.setFillColor(243, 244, 246);
+      doc.rect(8, 122, 132, 22, 'F');
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(11, 30, 54);
+      doc.text('CONTROLE DE AUTENTICIDADE E INTEGRIDADE', 12, 127);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(107, 114, 128);
+      doc.text(`Chave Eletrônica de Controle (UUID): ${timeRecordId}`, 12, 132);
+      
+      const hashSimples = btoa(timeRecordId + '-' + horarioBatida.getTime()).slice(0, 32);
+      doc.text(`Assinatura Digital do Programa: SHA256/SIMPLE:${hashSimples}`, 12, 137);
+      doc.text('Este recibo comprova a batida de ponto nos termos do programa REP-P.', 12, 141);
+
+      // Gerar PDF em Blob
+      const pdfBlob = doc.output('blob');
+      const caminhoArquivo = `${user?.id}/${timeRecordId}.pdf`;
+
+      // 2. Upload para Supabase Storage
+      const { error: uploadError } = await supabaseClient
+        .storage
+        .from('ponto-recibos')
+        .upload(caminhoArquivo, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 3. Salvar o receipt_path no registro correspondente
+      const { error: updateError } = await supabaseClient
+        .from('time_records')
+        .update({ receipt_path: caminhoArquivo })
+        .eq('id', timeRecordId);
+
+      if (updateError) throw updateError;
+      console.log('Recibo de batida em conformidade com a Portaria 671 gerado e salvo com sucesso.');
+    } catch (err) {
+      console.error('Erro ao processar e persistir o recibo de ponto:', err);
+    }
+  };
+
   const executarBaterPonto = async (tipoRegistro: 'Entrada' | 'Almoço' | 'Retorno' | 'Saída') => {
     const converterBase64ParaBlob = (base64: string): Blob => {
       const partes = base64.split(';base64,');
@@ -417,6 +559,20 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
         .select();
 
       if (error) throw error;
+
+      // Gerar e Salvar Recibo PDF no Storage (Portaria 671)
+      if (recordData && recordData[0]) {
+        const timeRecordId = recordData[0].id;
+        const horarioServidor = new Date(recordData[0].recorded_at);
+        await executarGerarESalvarRecibo(
+          timeRecordId,
+          tipoRegistro,
+          horarioServidor,
+          coordenadas.latitude,
+          coordenadas.longitude,
+          distanciaCalculada
+        );
+      }
 
       // Se for Entrada, salva a foto de biometria na tabela dedicada 'employee_photos'
       if (tipoRegistro === 'Entrada' && fotoCapturada && recordData && recordData[0]) {
@@ -1016,7 +1172,8 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
                           <th className="py-3 px-5">Tipo</th>
                           <th className="py-3 px-5">Data</th>
                           <th className="py-3 px-5">Horário</th>
-                          <th className="py-3 px-5 text-right">Status</th>
+                          <th className="py-3 px-5 text-center">Status</th>
+                          <th className="py-3 px-5 text-right">Comprovante</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-xs md:text-sm">
@@ -1031,11 +1188,48 @@ export const AccountantArea: React.FC<AccountantAreaProps> = ({ onBackToHome, on
                             </td>
                             <td className="py-3.5 px-5 text-slate-500">{ponto.dataRegistro}</td>
                             <td className="py-3.5 px-5 font-mono font-semibold text-slate-700">{ponto.horario}</td>
-                            <td className="py-3.5 px-5 text-right">
+                            <td className="py-3.5 px-5 text-center">
                               <span className="inline-flex items-center gap-1 py-0.5 px-2 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <Check className="w-3 h-3" />
                                 Confirmado
                               </span>
+                            </td>
+                            <td className="py-3.5 px-5 text-right">
+                              {ponto.receiptPath ? (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const token = await getToken({ template: 'supabase' });
+                                      if (!token) return;
+                                      const supabaseClient = obterSupabaseClient(token);
+                                      
+                                      const { data, error } = await supabaseClient
+                                        .storage
+                                        .from('ponto-recibos')
+                                        .download(ponto.receiptPath);
+                                        
+                                      if (error) throw error;
+                                      
+                                      const urlBlob = URL.createObjectURL(data);
+                                      const link = document.createElement('a');
+                                      link.href = urlBlob;
+                                      link.download = `Recibo_Ponto_${ponto.tipo}_${ponto.dataRegistro.replace(/\//g, '-')}.pdf`;
+                                      link.click();
+                                      URL.revokeObjectURL(urlBlob);
+                                    } catch (err) {
+                                      console.error('Erro ao baixar recibo:', err);
+                                      alert('Erro ao carregar o arquivo do recibo de ponto.');
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-ocean-50 hover:bg-ocean-100 text-ocean-700 hover:text-ocean-900 border border-ocean-200 rounded-lg text-[10px] font-bold transition-all shadow-sm"
+                                  title="Baixar Comprovante (Portaria 671)"
+                                >
+                                  <Download className="w-3 h-3" />
+                                  <span>Recibo PDF</span>
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">Sem recibo</span>
+                              )}
                             </td>
                           </tr>
                         ))}

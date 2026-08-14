@@ -35,6 +35,8 @@ interface Employee {
   is_admin: boolean;
   allow_home_office: boolean;
   created_at: string;
+  cpf?: string;
+  cargo?: string;
 }
 
 interface TimeRecord {
@@ -67,6 +69,13 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
   const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
   const [draftHomeOffice, setDraftHomeOffice] = useState<Record<string, boolean>>({});
   const [salvandoConfig, setSalvandoConfig] = useState(false);
+  
+  // Estados para edição do colaborador (Portaria 671)
+  const [isEditing, setIsEditing] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [cpfInput, setCpfInput] = useState('');
+  const [cargoInput, setCargoInput] = useState('');
+  const [salvandoColaborador, setSalvandoColaborador] = useState(false);
   
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');
@@ -559,7 +568,10 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
                       .map(emp => (
                         <button
                           key={emp.clerk_id}
-                          onClick={() => setSelectedEmployeeId(emp.clerk_id)}
+                          onClick={() => {
+                            setSelectedEmployeeId(emp.clerk_id);
+                            setIsEditing(false);
+                          }}
                           className={`w-full p-4 text-left flex items-center justify-between transition-colors ${
                             selectedEmployeeId === emp.clerk_id ? 'bg-red-50/40 border-r-4 border-red-500' : 'hover:bg-slate-50/50'
                           }`}
@@ -596,6 +608,124 @@ export const AdminArea: React.FC<AdminAreaProps> = ({ onBackToPortal }) => {
                               <p className="text-xs text-slate-500 mt-0.5">{emp?.email}</p>
                             </div>
                             <span className="text-[10px] text-slate-400 font-medium">Cadastrado em {formatarDataLocal(emp?.created_at || '')}</span>
+                          </div>
+
+                          {/* Dados de Conformidade (Portaria 671) */}
+                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/60 space-y-3">
+                            <div className="flex justify-between items-center">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Dados de Conformidade (Portaria 671)</h4>
+                              {!isEditing ? (
+                                <button
+                                  onClick={() => {
+                                    setIsEditing(true);
+                                    setNameInput(emp?.name || '');
+                                    setCpfInput(emp?.cpf || '');
+                                    setCargoInput(emp?.cargo || '');
+                                  }}
+                                  className="text-xs font-bold text-red-600 hover:text-red-700 transition-colors"
+                                >
+                                  Editar Dados
+                                </button>
+                              ) : null}
+                            </div>
+                            
+                            {!isEditing ? (
+                              <div className="grid grid-cols-2 gap-4 text-xs">
+                                <div>
+                                  <span className="text-slate-400 block font-medium">CPF:</span>
+                                  <strong className="text-slate-700 font-semibold">{emp?.cpf || 'Não cadastrado'}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block font-medium">Cargo / Função:</span>
+                                  <strong className="text-slate-700 font-semibold">{emp?.cargo || 'Não cadastrado'}</strong>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Nome Completo</label>
+                                    <input
+                                      type="text"
+                                      value={nameInput}
+                                      onChange={e => setNameInput(e.target.value)}
+                                      className="w-full text-xs border border-slate-200 rounded-lg p-2 focus:border-red-400 focus:ring-red-400 text-slate-700 bg-white font-medium"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">CPF</label>
+                                    <input
+                                      type="text"
+                                      value={cpfInput}
+                                      placeholder="000.000.000-00"
+                                      onChange={e => {
+                                        const clean = e.target.value.replace(/\D/g, '').slice(0, 11);
+                                        let masked = clean;
+                                        if (clean.length > 9) {
+                                          masked = `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6, 9)}-${clean.slice(9)}`;
+                                        } else if (clean.length > 6) {
+                                          masked = `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6)}`;
+                                        } else if (clean.length > 3) {
+                                          masked = `${clean.slice(0, 3)}.${clean.slice(3)}`;
+                                        }
+                                        setCpfInput(masked);
+                                      }}
+                                      className="w-full text-xs border border-slate-200 rounded-lg p-2 focus:border-red-400 focus:ring-red-400 text-slate-700 bg-white font-medium"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Cargo / Função</label>
+                                    <input
+                                      type="text"
+                                      value={cargoInput}
+                                      placeholder="Ex: Contador Sênior"
+                                      onChange={e => setCargoInput(e.target.value)}
+                                      className="w-full text-xs border border-slate-200 rounded-lg p-2 focus:border-red-400 focus:ring-red-400 text-slate-700 bg-white font-medium"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex justify-end gap-2 pt-1">
+                                  <button
+                                    onClick={() => setIsEditing(false)}
+                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-[10px] transition-colors"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (!emp?.clerk_id) return;
+                                      setSalvandoColaborador(true);
+                                      try {
+                                        const token = await getToken({ template: 'supabase' });
+                                        if (!token) return;
+                                        const supabaseClient = obterSupabaseClient(token);
+                                        const { error } = await supabaseClient
+                                          .from('employees')
+                                          .update({
+                                            name: nameInput,
+                                            cpf: cpfInput,
+                                            cargo: cargoInput
+                                          })
+                                          .eq('clerk_id', emp.clerk_id);
+                                        if (error) throw error;
+                                        setIsEditing(false);
+                                        await carregarDados();
+                                        alert('Dados do colaborador salvos com sucesso!');
+                                      } catch (err) {
+                                        console.error('Erro ao salvar dados do colaborador:', err);
+                                        alert('Erro ao salvar dados do colaborador.');
+                                      } finally {
+                                        setSalvandoColaborador(false);
+                                      }
+                                    }}
+                                    disabled={salvandoColaborador}
+                                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-[10px] transition-colors flex items-center gap-1"
+                                  >
+                                    {salvandoColaborador ? 'Salvando...' : 'Salvar'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           {/* Photos grid */}
